@@ -321,6 +321,14 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
           <option value="3">Sem 4 — 19 Ene–25 Ene</option>
         </select>
       </div>
+      <select id="skill-filter" onchange="changeSkill(this.value)" style="border:1.5px solid var(--or-border);border-radius:8px;padding:6px 12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:var(--or);background:var(--or-light);outline:none;cursor:pointer;border-left:3px solid var(--or)">
+        <option value="">Todas las cuadrillas</option>
+        <option value="Normal">Normal</option>
+        <option value="Moto">Moto</option>
+        <option value="Hibrida">Híbrida</option>
+        <option value="Elite">Elite</option>
+        <option value="Multidistrito">Multidistrito</option>
+      </select>
       <div class="icon-btn">
         <svg viewBox="0 0 24 24" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
         <span class="notif-dot"></span>
@@ -362,13 +370,13 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       <!-- Bono Pagado vs Presupuesto -->
       <div class="cc">
         <div class="cc-head">
-          <div><div class="cc-title">Bono Pagado vs Presupuesto</div><div class="cc-sub">Ejecución financiera acumulada por distrito</div></div>
+          <div><div class="cc-title">Bono Pagado vs Presupuesto</div><div class="cc-sub">Haz clic en un distrito para ver su detalle completo</div></div>
           <div style="display:flex;gap:14px;font-size:11px;align-items:center">
-            <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:6px;background:#C8C8D0;border-radius:2px;display:inline-block"></span>Presupuesto</span>
-            <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:6px;background:var(--or);border-radius:2px;display:inline-block"></span>Pagado</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#C8C8D0;border-radius:2px;display:inline-block"></span>Presupuesto</span>
+            <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:var(--or);border-radius:2px;display:inline-block"></span>Pagado</span>
           </div>
         </div>
-        <div class="g2" id="cmp-bars-grid"></div>
+        <div style="height:300px"><canvas id="chart-bono-dist"></canvas></div>
       </div>
 
     </div><!-- /nacional -->
@@ -618,8 +626,29 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
               <div><div class="cc-title">Asistencia</div><div class="cc-sub">Últimos 30 días</div></div>
               <span class="chip chip-gy">30 DÍAS</span>
             </div>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:5px;display:flex;gap:6px">
+              <span style="flex:1;text-align:center">L</span><span style="flex:1;text-align:center">M</span><span style="flex:1;text-align:center">X</span><span style="flex:1;text-align:center">J</span><span style="flex:1;text-align:center">V</span><span style="flex:1;text-align:center">S</span>
+            </div>
             <div class="heatmap" id="heatmap-grid"></div>
             <div class="hm-legend" id="heatmap-legend"></div>
+            <div id="day-detail-panel" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:12px;font-weight:700;color:var(--text)" id="day-detail-title"></div>
+                <span style="cursor:pointer;color:var(--text3);font-size:20px;line-height:1;padding:0 4px" onclick="document.getElementById('day-detail-panel').style.display='none'">×</span>
+              </div>
+              <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse" id="day-detail-table">
+                <thead><tr>
+                  <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap">Hora</th>
+                  <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap">OS</th>
+                  <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap">OT</th>
+                  <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;text-align:left;border-bottom:1px solid var(--border)">Tipo de Servicio</th>
+                  <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;text-align:right;border-bottom:1px solid var(--border)">⭐</th>
+                </tr></thead>
+                <tbody id="day-detail-tbody"></tbody>
+              </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -702,6 +731,18 @@ const OR_SHADES=['#E85420','#F0703A','#F58050','#F89060','#FAA070'];
 // ═══════════════════════════════════════════
 let allData=[], coordData=[], currentWeek=2;
 let selDistrito=null, selCoord=null, selTecnico=null;
+let globalSkill='';
+function getFiltered(){return globalSkill?allData.filter(t=>t.skill===globalSkill):allData;}
+function changeSkill(v){
+  globalSkill=v;
+  const active=document.querySelector('.view.active');
+  if(!active)return;
+  const id=active.id.replace('view-','');
+  if(id==='nacional')renderNacional();
+  else if(id==='distritos'){if(document.getElementById('dist-detail-view').style.display!=='none'&&selDistrito)renderDistDetail(selDistrito);else renderDistList();}
+  else if(id==='coordinadores'){if(document.getElementById('coord-detail-view').style.display!=='none'&&selCoord)renderCoordDetail(coordData.find(c=>c.id===selCoord));else renderCoordList();}
+  else if(id==='tecnicos'){if(document.getElementById('tec-ficha-view').style.display!=='none'&&selTecnico){const t=getFiltered().find(x=>x.id===selTecnico);if(t)renderFicha(t);}else applyTecFilters();}
+}
 let tecSearch='', tecDist='', tecSkill='', tecLevel='';
 let distSearch='', distType='';
 let coordSearch='', coordDist='';
@@ -775,6 +816,18 @@ function generateData(wk){
         asist.push(rnd<0.78?'p':rnd<0.88?'a':'r');
       }
 
+      // Órdenes por día (para heatmap clickeable)
+      const ordersByDay={};
+      asist.forEach((s,di)=>{
+        if(s==='p'){
+          const n=r(3,9);
+          ordersByDay[di]=Array.from({length:n},()=>{
+            const svc=ch(SERVICIOS);
+            return {os:'OS-'+Math.random().toString(36).substr(2,6).toUpperCase(),ot:'OT-'+r(1000000,9999999),tipo:svc[0],estrellas:svc[1],hora:`${r(7,18)}:${String(r(0,59)).padStart(2,'0')}`};
+          }).sort((a,b)=>a.hora.localeCompare(b.hora));
+        }
+      });
+
       const id=`TEC-${String(allData.length+1).padStart(4,'0')}`;
       const coord=distCoords[i%distCoords.length];
       coord.tecnicosIds.push(id);
@@ -784,7 +837,7 @@ function generateData(wk){
         id, nombre:NMX[tecIdx%NMX.length], coordId:coord.id, coordNombre:coord.nombre,
         distrito:dist, skill, meta, tipo, estrellas:est, pct, dias, inas,
         bonoBase:bb, bono110:b11, descuento:desc, bonoFinal:bf,
-        historial:hist, asistencia:asist,
+        historial:hist, asistencia:asist, ordersByDay,
         especialidad:ESPECIALIDADES[i%5], edad:r(22,48), exp:`${r(1,9)} años, ${r(0,11)} meses`,
       });
       tecIdx++;
@@ -854,11 +907,12 @@ function nav(id,el){
 // NACIONAL
 // ═══════════════════════════════════════════
 function renderNacional(){
-  const total=allData.length;
-  const conBono=allData.filter(t=>t.bonoFinal>0).length;
-  const totalBonos=allData.reduce((s,t)=>s+t.bonoFinal,0);
-  const cobertura=(allData.filter(t=>t.pct>=80).length/total*100).toFixed(1);
-  const estrellas=allData.reduce((s,t)=>s+t.estrellas,0);
+  const fd=getFiltered();
+  const total=fd.length||1;
+  const conBono=fd.filter(t=>t.bonoFinal>0).length;
+  const totalBonos=fd.reduce((s,t)=>s+t.bonoFinal,0);
+  const cobertura=(fd.filter(t=>t.pct>=80).length/total*100).toFixed(1);
+  const estrellas=fd.reduce((s,t)=>s+t.estrellas,0);
   const presupuesto=Math.round(totalBonos*1.08);
   const desv=totalBonos-presupuesto;
 
@@ -908,32 +962,58 @@ function renderNacional(){
     <div class="stat-pair-item"><div class="stat-pair-label">Máximo Histórico</div><div class="stat-pair-val" style="color:var(--or)">${mx.toFixed(1)}%</div></div>
     <div class="stat-pair-item"><div class="stat-pair-label">Tendencia</div><div class="stat-pair-val" style="color:var(--green)">↑ +${trend.toFixed(1)} pts</div></div>`;
 
-  // Bono vs Presupuesto
-  const dists=Object.keys(METAS);
+  // Bono vs Presupuesto — grouped bar chart clickeable por distrito
   const distBonos={};
-  allData.forEach(t=>{distBonos[t.distrito]=(distBonos[t.distrito]||0)+t.bonoFinal;});
-  const distList=Object.entries(distBonos).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  const half=Math.ceil(distList.length/2);
-  const leftItems=distList.slice(0,half), rightItems=distList.slice(half);
-  function cmpHTML(items){
-    return items.map(([d,pago])=>{
-      const pres=Math.round(pago*(1+r(-8,15)/100));
-      const diff=((pago-pres)/pres*100).toFixed(1);
-      const pos=parseFloat(diff)>=0;
-      const maxW=Math.max(pago,pres);
-      return `<div class="cmp-item">
-        <div class="cmp-hdr">
-          <span class="cmp-name">${distShort(d)}</span>
-          <span class="${pos?'cmp-diff-pos':'cmp-diff-neg'}">${pos?'Diff: +'+diff+'%':'Bajo Presupuesto'}</span>
-        </div>
-        <div class="cmp-bars">
-          <div class="cmp-row"><div class="cmp-fill-pres" style="width:${(pres/maxW*100).toFixed(0)}%"></div></div>
-          <div class="cmp-row"><div class="cmp-fill-pago" style="width:${(pago/maxW*100).toFixed(0)}%"></div></div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-  document.getElementById('cmp-bars-grid').innerHTML=`<div>${cmpHTML(leftItems)}</div><div>${cmpHTML(rightItems)}</div>`;
+  fd.forEach(t=>{distBonos[t.distrito]=(distBonos[t.distrito]||0)+t.bonoFinal;});
+  const sortedDB=Object.entries(distBonos).sort((a,b)=>b[1]-a[1]);
+  const dbLabels=sortedDB.map(([d])=>distShort(d));
+  const dbPagado=sortedDB.map(([,v])=>v);
+  // Presupuesto: fijo por semana para que sea consistente (seed basado en nombre distrito)
+  const dbPres=sortedDB.map(([d,v])=>{
+    const seed=d.split('').reduce((a,c)=>a+c.charCodeAt(0),0)%20-10;
+    return Math.round(v*(1+seed/100));
+  });
+  const dbColors=sortedDB.map(([,pago],i)=>dbPago=>dbPres[i]?'#E85420':'#C62828');
+
+  if(window._chartBonoDist)window._chartBonoDist.destroy();
+  window._chartBonoDist=new Chart(document.getElementById('chart-bono-dist'),{
+    type:'bar',
+    data:{labels:dbLabels,datasets:[
+      {label:'Presupuesto',data:dbPres,backgroundColor:'rgba(200,200,208,.8)',borderRadius:4,borderSkipped:false,borderWidth:0},
+      {label:'Pagado',data:dbPagado,backgroundColor:sortedDB.map(([,v],i)=>dbPagado[i]>=dbPres[i]?'#E85420':'#DC2626'),borderRadius:4,borderSkipped:false,borderWidth:0},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      onClick:(evt,elements)=>{
+        if(!elements.length)return;
+        const idx=elements[0].index;
+        const dist=sortedDB[idx][0];
+        document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+        document.querySelectorAll('.nav-i').forEach(n=>n.classList.remove('active'));
+        document.getElementById('view-distritos').classList.add('active');
+        document.querySelectorAll('.nav-i')[1].classList.add('active');
+        document.getElementById('tb-title').textContent='Vista de Distritos';
+        document.getElementById('tb-badge').textContent='Análisis por zona';
+        openDist(dist);
+      },
+      plugins:{
+        legend:{display:true,position:'top',labels:{font:{size:11},boxWidth:10,boxHeight:10}},
+        tooltip:{callbacks:{
+          label:c=>c.dataset.label+': '+f$(c.parsed.y),
+          afterBody:items=>{
+            const i=items[0].dataIndex;
+            const diff=((dbPagado[i]-dbPres[i])/dbPres[i]*100).toFixed(1);
+            const sign=parseFloat(diff)>=0?'+':'';
+            return [`Variación: ${sign}${diff}%`,`→ Clic para ver detalle del distrito`];
+          }
+        }}
+      },
+      scales:{
+        x:{ticks:{font:{size:9},maxRotation:40},grid:{display:false}},
+        y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}},
+      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -941,7 +1021,7 @@ function renderNacional(){
 // ═══════════════════════════════════════════
 function renderDistList(){
   const stats={};
-  allData.forEach(t=>{
+  getFiltered().forEach(t=>{
     if(!stats[t.distrito])stats[t.distrito]={tipo:t.tipo,n:0,cb:0,totalB:0,sumPct:0};
     const s=stats[t.distrito]; s.n++; s.totalB+=t.bonoFinal; s.sumPct+=t.pct;
     if(t.bonoFinal>0)s.cb++;
@@ -986,7 +1066,7 @@ function openDist(d){
 
 function renderDistDetail(d){
   const info=METAS[d];
-  const tecs=allData.filter(t=>t.distrito===d);
+  const tecs=getFiltered().filter(t=>t.distrito===d);
   const totalB=tecs.reduce((s,t)=>s+t.bonoFinal,0);
   const avgPct=(tecs.reduce((s,t)=>s+t.pct,0)/tecs.length).toFixed(1);
   const avgProd=(tecs.reduce((s,t)=>s+t.estrellas,0)/tecs.length/6).toFixed(1);
@@ -1143,7 +1223,7 @@ function renderCoordDetail(coord){
   document.getElementById('coord-detail-name').textContent=coord.nombre;
   document.getElementById('coord-detail-sub').textContent=`Coordinador Operativo · ${distShort(coord.distrito)} · Semana 3`;
 
-  const tecs=allData.filter(t=>coord.tecnicosIds.includes(t.id));
+  const tecs=getFiltered().filter(t=>coord.tecnicosIds.includes(t.id));
   const alcanceMeta=coord.alcanceMeta;
   const asistPct=r(88,99);
   const prodAlcance=r(65,95);
@@ -1232,7 +1312,7 @@ function renderTecList(){
 
 let _tecFiltered=[];
 function applyTecFilters(){
-  _tecFiltered=allData.filter(t=>{
+  _tecFiltered=getFiltered().filter(t=>{
     if(tecSearch&&!t.nombre.toLowerCase().includes(tecSearch)&&!t.id.includes(tecSearch))return false;
     if(tecDist&&t.distrito!==tecDist)return false;
     if(tecSkill&&t.skill!==tecSkill)return false;
@@ -1349,9 +1429,15 @@ function renderFicha(t){
       scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}}}}
   });
 
-  // Heatmap
+  // Heatmap clickeable
+  window._curOrdersByDay=t.ordersByDay||{};
+  document.getElementById('day-detail-panel').style.display='none';
   const hm=document.getElementById('heatmap-grid');
-  hm.innerHTML=t.asistencia.map(v=>`<div class="hm-cell ${v==='p'?'hm-p':v==='a'?'hm-a':'hm-r'}"></div>`).join('');
+  hm.innerHTML=t.asistencia.map((v,di)=>{
+    const cls=v==='p'?'hm-p':v==='a'?'hm-a':'hm-r';
+    const clickable=v==='p'&&window._curOrdersByDay[di];
+    return `<div class="hm-cell ${cls}" style="cursor:${clickable?'pointer':'default'};${clickable?'box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.18)':''}" title="${clickable?'Ver órdenes del día':v==='a'?'Inasistencia':'Descanso'}" ${clickable?`onclick="showDayDetail(${di})"`:''} ></div>`;
+  }).join('');
   const pCount=t.asistencia.filter(v=>v==='p').length;
   const aCount=t.asistencia.filter(v=>v==='a').length;
   const rCount=t.asistencia.filter(v=>v==='r').length;
@@ -1382,6 +1468,35 @@ function renderConfig(){
     <td>${info.N}</td><td>${info.Mo}</td><td>${info.H}</td><td>${info.E}</td><td>${info.Mu}</td></tr>`).join('');
   document.getElementById('tbody-servicios').innerHTML=SERVICIOS.map(([s,p])=>`
     <tr><td>${s}</td><td><strong>⭐ ${p}</strong></td></tr>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// DAY DETAIL (Heatmap)
+// ═══════════════════════════════════════════
+function showDayDetail(dayIdx){
+  const orders=window._curOrdersByDay[dayIdx];
+  if(!orders||!orders.length)return;
+  const weekDays=['Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const weekNum=Math.floor(dayIdx/6)+1;
+  const dayName=weekDays[dayIdx%6];
+  const totalStars=orders.reduce((s,o)=>s+o.estrellas,0);
+  document.getElementById('day-detail-title').innerHTML=
+    `<span style="color:var(--or)">Semana ${weekNum} — ${dayName}</span> &nbsp;·&nbsp; ${orders.length} órdenes &nbsp;·&nbsp; <span style="color:var(--green)">⭐ ${totalStars} estrellas</span>`;
+  document.getElementById('day-detail-tbody').innerHTML=orders.map(o=>`
+    <tr>
+      <td style="padding:5px 8px;font-size:12px;color:var(--text3)">${o.hora}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;color:var(--or);white-space:nowrap">${o.os}</td>
+      <td style="padding:5px 8px;font-size:11px;font-family:monospace;color:var(--text2);white-space:nowrap">${o.ot}</td>
+      <td style="padding:5px 8px;font-size:12px">${o.tipo}</td>
+      <td style="padding:5px 8px;font-size:12px;text-align:right;font-weight:700;color:var(--or)">⭐ ${o.estrellas}</td>
+    </tr>`).join('')+`
+    <tr style="background:#FAFAFA">
+      <td colspan="4" style="padding:6px 8px;font-size:11px;font-weight:700;text-align:right;color:var(--text2);border-top:1px solid var(--border)">Total del día:</td>
+      <td style="padding:6px 8px;font-size:13px;font-weight:800;text-align:right;color:var(--green);border-top:1px solid var(--border)">⭐ ${totalStars}</td>
+    </tr>`;
+  const panel=document.getElementById('day-detail-panel');
+  panel.style.display='block';
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 // ═══════════════════════════════════════════
