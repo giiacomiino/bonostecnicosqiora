@@ -248,6 +248,9 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 
 /* INPUTS */
 .fi{border:1.5px solid var(--border);border-radius:8px;padding:7px 11px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);background:#F9F9FB;outline:none}
+.cfg-num{width:68px;border:1.5px solid var(--border);border-radius:6px;padding:4px 7px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);background:#F9F9FB;outline:none;text-align:center}
+.cfg-num:focus{border-color:var(--or);background:white}
+.cfg-sel{border:1.5px solid var(--border);border-radius:6px;padding:3px 6px;font-family:'Inter',sans-serif;font-size:12px;color:var(--text);background:#F9F9FB;outline:none;cursor:pointer}
 .fi:focus{border-color:var(--or)}
 .fs{border:1.5px solid var(--border);border-radius:8px;padding:7px 11px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);background:#F9F9FB;outline:none;cursor:pointer}
 
@@ -667,30 +670,67 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 
     <!-- ══════ VIEW: CONFIG ══════ -->
     <div class="view" id="view-config">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text)">Ajustes del Sistema</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">Edita metas, montos de bono y ponderación de servicios. Los cambios aplican de inmediato al recalcular.</div>
+        </div>
+        <button onclick="saveConfig()" style="background:var(--or);color:white;border:none;border-radius:8px;padding:10px 20px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+          <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Guardar y Recalcular
+        </button>
+      </div>
+
+      <div class="tc mb" style="margin-bottom:20px">
+        <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:13px;font-weight:700">Metas por Distrito y Tipo de Cuadrilla</div>
+          <div style="font-size:11px;color:var(--text3)">Valores en estrellas (⭐) semanales por skill</div>
+        </div>
+        <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th>Distrito</th><th>Tipo</th>
+            <th>Normal</th><th>Moto</th><th>Híbrida</th><th>Elite</th><th>Multi</th>
+            <th>Desc. Inas.</th>
+          </tr></thead>
+          <tbody id="tbody-config"></tbody>
+        </table>
+        </div>
+      </div>
+
       <div class="g2">
         <div>
-          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Metas por Distrito y Skill</div>
-          <div class="tc">
-            <table>
-              <thead><tr><th>Distrito</th><th>Tipo</th><th>Normal</th><th>Moto</th><th>Híbrida</th><th>Elite</th><th>Multi</th></tr></thead>
-              <tbody id="tbody-config"></tbody>
-            </table>
-          </div>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Esquema de Bonos Base</div>
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Montos de Bono Base (MXN)</div>
           <div class="cc mb">
             <table>
               <thead><tr><th>Tipo</th><th>80–89%</th><th>90–99%</th><th>100%+</th><th>Bono 110%</th></tr></thead>
               <tbody>
-                <tr><td><span style="background:var(--blue-l);color:var(--blue);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">Tipo A</span></td><td>$500</td><td>$900</td><td>$2,500</td><td>+$500 fijo</td></tr>
-                <tr><td><span style="background:#F3F4F6;color:var(--text2);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">Tipo B</span></td><td>$450</td><td>$800</td><td>$1,800</td><td>+$100 c/6⭐ (máx $500)</td></tr>
+                <tr>
+                  <td><span style="background:var(--blue-l);color:var(--blue);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">Tipo A</span></td>
+                  <td><input class="cfg-num" id="bonoA80" type="number" value="500" min="0"/></td>
+                  <td><input class="cfg-num" id="bonoA90" type="number" value="900" min="0"/></td>
+                  <td><input class="cfg-num" id="bonoA100" type="number" value="2500" min="0"/></td>
+                  <td style="font-size:12px;color:var(--text2)">+$500 fijo</td>
+                </tr>
+                <tr>
+                  <td><span style="background:#F3F4F6;color:var(--text2);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">Tipo B</span></td>
+                  <td><input class="cfg-num" id="bonoB80" type="number" value="450" min="0"/></td>
+                  <td><input class="cfg-num" id="bonoB90" type="number" value="800" min="0"/></td>
+                  <td><input class="cfg-num" id="bonoB100" type="number" value="1800" min="0"/></td>
+                  <td style="font-size:12px;color:var(--text2)">+$100/6⭐ (máx $500)</td>
+                </tr>
               </tbody>
             </table>
           </div>
-          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Ponderación por Servicio</div>
-          <div class="cc"><table><thead><tr><th>Tipo de Servicio</th><th>Puntos ⭐</th></tr></thead><tbody id="tbody-servicios"></tbody></table></div>
         </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Ponderación por Tipo de Servicio</div>
+          <div class="cc"><table><thead><tr><th>Tipo de Servicio</th><th style="text-align:center">Puntos ⭐</th></tr></thead><tbody id="tbody-servicios"></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="cfg-saved-msg" style="display:none;margin-top:14px;background:var(--green-l);color:var(--green);border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600">
+        ✓ Configuración guardada — bonos recalculados correctamente.
       </div>
     </div><!-- /config -->
 
@@ -702,26 +742,26 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 // CONSTANTS
 // ═══════════════════════════════════════════
 const METAS={
-  'GS2-BAJ-IRA IRAPUATO':       {t:'B',N:75,Mo:60,H:75,E:75,Mu:75},
-  'GS2-BAJ-LON LEON':           {t:'B',N:75,Mo:70,H:75,E:75,Mu:75},
-  'GS2-OCC-COL COLIMA':         {t:'B',N:90,Mo:70,H:90,E:90,Mu:90},
-  'GS2-OCC-GDL BARRANCA':       {t:'A',N:90,Mo:70,H:90,E:90,Mu:90},
-  'GS2-OCC-GDL ESTADIO':        {t:'A',N:90,Mo:60,H:90,E:90,Mu:90},
-  'GS2-OCC-GDL LOPEZ MATEOS':   {t:'A',N:75,Mo:60,H:75,E:75,Mu:75},
-  'GS2-OCC-GDL PRIMAVERA':      {t:'A',N:90,Mo:60,H:90,E:90,Mu:90},
-  'GS2-OCC-MOR MORELIA':        {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-OCC-TEP TEPIC':          {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-SUR-CUN CANCUN 1':       {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-OTE-CBA CORDOBA ORIZABA':{t:'B',N:75,Mo:60,H:75,E:75,Mu:75},
-  'GS2-OTE-PUE PUEBLA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-OTE-VER VERACRUZ':       {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-OTE-XAL XALAPA':        {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-OCC-AGS AGUASCALIENTES': {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-SUR-TUX TUXTLA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'GS2-SUR-MER MERIDA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-CUN CANCUN 1':       {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-VRZ VERACRUZ':       {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-TUX TUXTLA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-XAL XALAPA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-MER MERIDA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-IRA IRAPUATO':       {t:'B',N:75,Mo:60,H:75,E:75,Mu:75},
+  'CTA-TPI-INT-LON LEON':           {t:'B',N:75,Mo:70,H:75,E:75,Mu:75},
+  'CTA-TPI-INT-MOR MORELIA':        {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-PUE PUEBLA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-GBA GDL BARRANCA':   {t:'A',N:90,Mo:70,H:90,E:90,Mu:90},
+  'CTA-TPI-INT-GPR GDL PRIMAVERA':  {t:'A',N:90,Mo:60,H:90,E:90,Mu:90},
+  'CTA-TPI-INT-GES GDL ESTADIO':    {t:'A',N:90,Mo:60,H:90,E:90,Mu:90},
+  'CTA-TPI-INT-CBA CORDOBA ORIZABA':{t:'B',N:75,Mo:60,H:75,E:75,Mu:75},
+  'CTA-TPI-INT-GLM GDL LOPEZ MATEOS':{t:'A',N:75,Mo:60,H:75,E:75,Mu:75},
+  'CTA-TPI-INT-AGS AGUASCALIENTES': {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-TEP TEPIC':          {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
+  'CTA-TPI-INT-COL COLIMA':         {t:'B',N:90,Mo:70,H:90,E:90,Mu:90},
 };
 const BONOS={A:{'80':500,'90':900,'100':2500},B:{'80':450,'90':800,'100':1800}};
-const DESC_D=new Set(['GS2-BAJ-IRA IRAPUATO','GS2-BAJ-LON LEON','GS2-OCC-GDL BARRANCA','GS2-OCC-GDL ESTADIO','GS2-OCC-GDL LOPEZ MATEOS','GS2-OCC-GDL PRIMAVERA']);
+const DESC_D=new Set(['CTA-TPI-INT-IRA IRAPUATO','CTA-TPI-INT-LON LEON','CTA-TPI-INT-GBA GDL BARRANCA','CTA-TPI-INT-GES GDL ESTADIO','CTA-TPI-INT-GLM GDL LOPEZ MATEOS','CTA-TPI-INT-GPR GDL PRIMAVERA']);
 const SERVICIOS=[['Instalación',4],['Soporte',2],['Mantenimiento Mayor',3],['Mantenimiento Menor',2],['Addons',2],['Cambio De Domicilio',3],['Cambio De Equipo',2],['Empresarial',5],['Recolección Pi',1],['Recolección',1],['Cambio De Plan',2],['Factibilidad',2],['Hallazgo Empresarial',3]];
 const SKILLS=['Normal','Moto','Hibrida','Elite','Multidistrito'];
 const SK_KEY={Normal:'N',Moto:'Mo',Hibrida:'H',Elite:'E',Multidistrito:'Mu'};
@@ -863,7 +903,7 @@ function generateData(wk){
 const f$=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
 const fM=n=>'$'+(n/1000000).toFixed(1)+'M';
 const fp=n=>n.toFixed(1)+'%';
-const distShort=d=>d.replace('GS2-','');
+const distShort=d=>d.replace('CTA-TPI-INT-','');
 function initials(n){const p=n.split(' ');return((p[0]||'')[0]+(p[1]||'')[0]).toUpperCase();}
 function pctColor(p){return p>=100?'var(--green)':p>=80?'var(--or)':'var(--red)';}
 function pctBadge(p){
@@ -1469,12 +1509,77 @@ function renderFicha(t){
 // CONFIG
 // ═══════════════════════════════════════════
 function renderConfig(){
-  document.getElementById('tbody-config').innerHTML=Object.entries(METAS).map(([d,info])=>`
-    <tr><td style="font-size:12px;font-weight:500">${distShort(d)}</td>
-    <td><span style="${info.t==='A'?'background:var(--blue-l);color:var(--blue)':'background:#F3F4F6;color:var(--text2)'};font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px">Tipo ${info.t}</span></td>
-    <td>${info.N}</td><td>${info.Mo}</td><td>${info.H}</td><td>${info.E}</td><td>${info.Mu}</td></tr>`).join('');
-  document.getElementById('tbody-servicios').innerHTML=SERVICIOS.map(([s,p])=>`
-    <tr><td>${s}</td><td><strong>⭐ ${p}</strong></td></tr>`).join('');
+  document.getElementById('tbody-config').innerHTML=Object.entries(METAS).map(([d,info])=>{
+    const hasDesc=DESC_D.has(d);
+    const tid=d.replace(/[^a-z0-9]/gi,'_');
+    return `<tr>
+      <td style="font-size:12px;font-weight:600;white-space:nowrap">${distShort(d)}</td>
+      <td>
+        <select class="cfg-sel" id="tipo_${tid}" onchange="updateMetaTipo('${d}',this.value)">
+          <option value="A"${info.t==='A'?' selected':''}>Tipo A</option>
+          <option value="B"${info.t==='B'?' selected':''}>Tipo B</option>
+        </select>
+      </td>
+      <td><input class="cfg-num" id="N_${tid}" type="number" value="${info.N}" min="0"/></td>
+      <td><input class="cfg-num" id="Mo_${tid}" type="number" value="${info.Mo}" min="0"/></td>
+      <td><input class="cfg-num" id="H_${tid}" type="number" value="${info.H}" min="0"/></td>
+      <td><input class="cfg-num" id="E_${tid}" type="number" value="${info.E}" min="0"/></td>
+      <td><input class="cfg-num" id="Mu_${tid}" type="number" value="${info.Mu}" min="0"/></td>
+      <td style="text-align:center">
+        <label style="display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px">
+          <input type="checkbox" id="desc_${tid}" ${hasDesc?'checked':''} onchange="updateDescD('${d}',this.checked)" style="accent-color:var(--or)"/>
+          Sí
+        </label>
+      </td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbody-servicios').innerHTML=SERVICIOS.map(([s,p],i)=>`
+    <tr><td style="font-size:12px">${s}</td><td style="text-align:center"><input class="cfg-num" id="svc_${i}" type="number" value="${p}" min="0" style="width:56px"/></td></tr>`).join('');
+  // sync bono inputs
+  document.getElementById('bonoA80').value=BONOS.A['80'];
+  document.getElementById('bonoA90').value=BONOS.A['90'];
+  document.getElementById('bonoA100').value=BONOS.A['100'];
+  document.getElementById('bonoB80').value=BONOS.B['80'];
+  document.getElementById('bonoB90').value=BONOS.B['90'];
+  document.getElementById('bonoB100').value=BONOS.B['100'];
+}
+
+function updateMetaTipo(dist,val){METAS[dist].t=val;}
+function updateDescD(dist,checked){if(checked)DESC_D.add(dist);else DESC_D.delete(dist);}
+
+function saveConfig(){
+  // Read meta inputs
+  Object.entries(METAS).forEach(([d,info])=>{
+    const tid=d.replace(/[^a-z0-9]/gi,'_');
+    const g=id=>{const el=document.getElementById(id);return el?parseInt(el.value)||0:null;};
+    if(g('N_'+tid)!==null){info.N=g('N_'+tid);info.Mo=g('Mo_'+tid);info.H=g('H_'+tid);info.E=g('E_'+tid);info.Mu=g('Mu_'+tid);}
+  });
+  // Read bono inputs
+  BONOS.A['80']=parseInt(document.getElementById('bonoA80').value)||500;
+  BONOS.A['90']=parseInt(document.getElementById('bonoA90').value)||900;
+  BONOS.A['100']=parseInt(document.getElementById('bonoA100').value)||2500;
+  BONOS.B['80']=parseInt(document.getElementById('bonoB80').value)||450;
+  BONOS.B['90']=parseInt(document.getElementById('bonoB90').value)||800;
+  BONOS.B['100']=parseInt(document.getElementById('bonoB100').value)||1800;
+  // Read service inputs
+  SERVICIOS.forEach((_,i)=>{const el=document.getElementById('svc_'+i);if(el)SERVICIOS[i][1]=parseInt(el.value)||1;});
+  // Recalculate bonuses for all data
+  allData.forEach(t=>{
+    const info=METAS[t.distrito]||{t:'B'};
+    const sk=SK_KEY[t.skill]||'N';
+    t.meta=info[sk]||info.N||84;
+    t.tipo=info.t;
+    t.pct=t.meta>0?Math.round(t.estrellas/t.meta*100):0;
+    t.bonoBase=bonoBase(t.pct,t.tipo);
+    t.bono110=bono110(t.pct,t.estrellas,t.meta,t.tipo);
+    t.descuento=descuento(t.distrito,t.inas,t.bonoBase,t.bono110);
+    t.bonoFinal=Math.max(0,t.bonoBase+t.bono110-t.descuento);
+  });
+  // Re-render active view
+  renderNacional();
+  const msg=document.getElementById('cfg-saved-msg');
+  msg.style.display='block';
+  setTimeout(()=>msg.style.display='none',3000);
 }
 
 // ═══════════════════════════════════════════
@@ -1483,15 +1588,43 @@ function renderConfig(){
 
 // Mapeo de nombres de distrito del archivo real → clave estándar
 const DIST_MAP={
-  'IRAPUATO':'GS2-BAJ-IRA IRAPUATO','LEON':'GS2-BAJ-LON LEON','LEON C':'GS2-BAJ-LON LEON',
-  'COLIMA':'GS2-OCC-COL COLIMA','BARRANCA':'GS2-OCC-GDL BARRANCA',
-  'ESTADIO':'GS2-OCC-GDL ESTADIO','LOPEZ MATEOS':'GS2-OCC-GDL LOPEZ MATEOS',
-  'PRIMAVERA':'GS2-OCC-GDL PRIMAVERA','MORELIA':'GS2-OCC-MOR MORELIA',
-  'TEPIC':'GS2-OCC-TEP TEPIC','CANCUN':'GS2-SUR-CUN CANCUN 1','CANCUN 1':'GS2-SUR-CUN CANCUN 1',
-  'CORDOBA':'GS2-OTE-CBA CORDOBA ORIZABA','CORDOBA ORIZABA':'GS2-OTE-CBA CORDOBA ORIZABA',
-  'PUEBLA':'GS2-OTE-PUE PUEBLA','VERACRUZ':'GS2-OTE-VER VERACRUZ','XALAPA':'GS2-OTE-XAL XALAPA',
-  'AGUASCALIENTES':'GS2-OCC-AGS AGUASCALIENTES','TUXTLA':'GS2-SUR-TUX TUXTLA',
-  'MERIDA':'GS2-SUR-MER MERIDA',
+  // Nombres exactos CTA-TPI-INT (directo)
+  'CTA-TPI-INT-CUN CANCUN 1':        'CTA-TPI-INT-CUN CANCUN 1',
+  'CTA-TPI-INT-VRZ VERACRUZ':        'CTA-TPI-INT-VRZ VERACRUZ',
+  'CTA-TPI-INT-TUX TUXTLA':          'CTA-TPI-INT-TUX TUXTLA',
+  'CTA-TPI-INT-XAL XALAPA':          'CTA-TPI-INT-XAL XALAPA',
+  'CTA-TPI-INT-MER MERIDA':          'CTA-TPI-INT-MER MERIDA',
+  'CTA-TPI-INT-IRA IRAPUATO':        'CTA-TPI-INT-IRA IRAPUATO',
+  'CTA-TPI-INT-LON LEON':            'CTA-TPI-INT-LON LEON',
+  'CTA-TPI-INT-MOR MORELIA':         'CTA-TPI-INT-MOR MORELIA',
+  'CTA-TPI-INT-PUE PUEBLA':          'CTA-TPI-INT-PUE PUEBLA',
+  'CTA-TPI-INT-GBA GDL BARRANCA':    'CTA-TPI-INT-GBA GDL BARRANCA',
+  'CTA-TPI-INT-GPR GDL PRIMAVERA':   'CTA-TPI-INT-GPR GDL PRIMAVERA',
+  'CTA-TPI-INT-GES GDL ESTADIO':     'CTA-TPI-INT-GES GDL ESTADIO',
+  'CTA-TPI-INT-CBA CORDOBA ORIZABA': 'CTA-TPI-INT-CBA CORDOBA ORIZABA',
+  'CTA-TPI-INT-GLM GDL LOPEZ MATEOS':'CTA-TPI-INT-GLM GDL LOPEZ MATEOS',
+  'CTA-TPI-INT-AGS AGUASCALIENTES':  'CTA-TPI-INT-AGS AGUASCALIENTES',
+  'CTA-TPI-INT-TEP TEPIC':           'CTA-TPI-INT-TEP TEPIC',
+  'CTA-TPI-INT-COL COLIMA':          'CTA-TPI-INT-COL COLIMA',
+  // Nombres cortos / variantes del Excel
+  'CANCUN 1':'CTA-TPI-INT-CUN CANCUN 1','CANCUN':'CTA-TPI-INT-CUN CANCUN 1',
+  'CUN CANCUN 1':'CTA-TPI-INT-CUN CANCUN 1',
+  'VERACRUZ':'CTA-TPI-INT-VRZ VERACRUZ','VRZ VERACRUZ':'CTA-TPI-INT-VRZ VERACRUZ',
+  'TUXTLA':'CTA-TPI-INT-TUX TUXTLA','TUX TUXTLA':'CTA-TPI-INT-TUX TUXTLA',
+  'XALAPA':'CTA-TPI-INT-XAL XALAPA','XAL XALAPA':'CTA-TPI-INT-XAL XALAPA',
+  'MERIDA':'CTA-TPI-INT-MER MERIDA','MER MERIDA':'CTA-TPI-INT-MER MERIDA',
+  'IRAPUATO':'CTA-TPI-INT-IRA IRAPUATO','IRA IRAPUATO':'CTA-TPI-INT-IRA IRAPUATO',
+  'LEON':'CTA-TPI-INT-LON LEON','LEON C':'CTA-TPI-INT-LON LEON','LON LEON':'CTA-TPI-INT-LON LEON',
+  'MORELIA':'CTA-TPI-INT-MOR MORELIA','MOR MORELIA':'CTA-TPI-INT-MOR MORELIA',
+  'PUEBLA':'CTA-TPI-INT-PUE PUEBLA','PUE PUEBLA':'CTA-TPI-INT-PUE PUEBLA',
+  'GDL BARRANCA':'CTA-TPI-INT-GBA GDL BARRANCA','BARRANCA':'CTA-TPI-INT-GBA GDL BARRANCA',
+  'GDL PRIMAVERA':'CTA-TPI-INT-GPR GDL PRIMAVERA','PRIMAVERA':'CTA-TPI-INT-GPR GDL PRIMAVERA',
+  'GDL ESTADIO':'CTA-TPI-INT-GES GDL ESTADIO','ESTADIO':'CTA-TPI-INT-GES GDL ESTADIO',
+  'CORDOBA ORIZABA':'CTA-TPI-INT-CBA CORDOBA ORIZABA','CORDOBA':'CTA-TPI-INT-CBA CORDOBA ORIZABA',
+  'GDL LOPEZ MATEOS':'CTA-TPI-INT-GLM GDL LOPEZ MATEOS','LOPEZ MATEOS':'CTA-TPI-INT-GLM GDL LOPEZ MATEOS',
+  'AGUASCALIENTES':'CTA-TPI-INT-AGS AGUASCALIENTES','AGS AGUASCALIENTES':'CTA-TPI-INT-AGS AGUASCALIENTES',
+  'TEPIC':'CTA-TPI-INT-TEP TEPIC','TEP TEPIC':'CTA-TPI-INT-TEP TEPIC',
+  'COLIMA':'CTA-TPI-INT-COL COLIMA','COL COLIMA':'CTA-TPI-INT-COL COLIMA',
 };
 // Mapeo de tipo cuadrilla del archivo real → clave interna
 const SKILL_MAP={'NORMAL':'Normal','PLANTA INTERNA':'Normal','MOTO':'Moto','HÍBRIDA':'Hibrida',
@@ -1500,9 +1633,15 @@ const SKILL_MAP={'NORMAL':'Normal','PLANTA INTERNA':'Normal','MOTO':'Moto','HÍB
 function normDist(raw){
   if(!raw)return null;
   const u=raw.toString().toUpperCase().trim();
-  for(const [k,v] of Object.entries(DIST_MAP)){if(u.includes(k))return v;}
-  // buscar coincidencia parcial en claves de METAS
-  for(const k of Object.keys(METAS)){if(k.toUpperCase().includes(u)||u.includes(k.toUpperCase().replace('GS2-OCC-','').replace('GS2-BAJ-','').replace('GS2-OTE-','').replace('GS2-SUR-','').trim()))return k;}
+  // exact match first
+  if(DIST_MAP[u])return DIST_MAP[u];
+  // contains match
+  for(const [k,v] of Object.entries(DIST_MAP)){if(u.includes(k)||k.includes(u))return v;}
+  // partial match against METAS keys (strip prefix)
+  for(const k of Object.keys(METAS)){
+    const short=k.toUpperCase().replace('CTA-TPI-INT-','').trim();
+    if(u===short||u.includes(short)||short.includes(u))return k;
+  }
   return null;
 }
 function normSkill(raw){
@@ -1589,7 +1728,7 @@ function processWorkbook(wb,filename){
     const key=nombre||idTec;
 
     const rawDist=row[C.dist]||'';
-    const dist=normDist(rawDist)||'GS2-OCC-GDL BARRANCA';
+    const dist=normDist(rawDist)||Object.keys(METAS)[0];
     const skill=normSkill(row[C.skill]);
     const stars=parseFloat(row[C.estrellas])||0;
     const meta=parseFloat(row[C.meta])||84;
