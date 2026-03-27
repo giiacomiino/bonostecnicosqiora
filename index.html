@@ -6,6 +6,7 @@
 <title>QiORA | Sistema de Bonos TotalPlay</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -191,7 +192,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 .btn-primary:hover{background:var(--or-dark)}
 
 /* HEATMAP */
-.heatmap{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-bottom:10px}
+.heatmap{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:10px}
 .hm-cell{aspect-ratio:1;border-radius:4px}
 .hm-p{background:#22C55E}.hm-a{background:#EF4444}.hm-r{background:#E5E7EB}
 .hm-legend{display:flex;flex-direction:column;gap:5px}
@@ -293,10 +294,14 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
   </div>
 
   <div class="s-export">
-    <button class="btn-exp" onclick="alert('Export PDF — conectar a backend')">
+    <input type="file" id="excel-input" accept=".xlsx,.xls" style="display:none" onchange="loadExcelFile(this)"/>
+    <button class="btn-exp" onclick="document.getElementById('excel-input').click()">
       <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Exportar PDF
+      <span id="load-btn-label">Cargar Excel</span>
     </button>
+    <div id="data-source-info" style="margin-top:8px;font-size:10px;color:var(--text3);text-align:center;line-height:1.4">
+      Datos: <span id="source-label" style="color:var(--or);font-weight:600">Demo (mock)</span>
+    </div>
   </div>
 </nav>
 
@@ -624,10 +629,10 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
           <div class="cc">
             <div class="cc-head">
               <div><div class="cc-title">Asistencia</div><div class="cc-sub">Últimos 30 días</div></div>
-              <span class="chip chip-gy">30 DÍAS</span>
+              <span class="chip chip-gy">35 DÍAS</span>
             </div>
-            <div style="font-size:10px;color:var(--text3);margin-bottom:5px;display:flex;gap:6px">
-              <span style="flex:1;text-align:center">L</span><span style="flex:1;text-align:center">M</span><span style="flex:1;text-align:center">X</span><span style="flex:1;text-align:center">J</span><span style="flex:1;text-align:center">V</span><span style="flex:1;text-align:center">S</span>
+            <div style="font-size:10px;color:var(--text3);margin-bottom:5px;display:flex;gap:4px">
+              <span style="flex:1;text-align:center">L</span><span style="flex:1;text-align:center">M</span><span style="flex:1;text-align:center">X</span><span style="flex:1;text-align:center">J</span><span style="flex:1;text-align:center">V</span><span style="flex:1;text-align:center">S</span><span style="flex:1;text-align:center;color:var(--red)">D</span>
             </div>
             <div class="heatmap" id="heatmap-grid"></div>
             <div class="hm-legend" id="heatmap-legend"></div>
@@ -809,11 +814,13 @@ function generateData(wk){
         hist.push(Math.round(base/100)*100);
       }
 
-      // Asistencia 30 días
+      // Asistencia 35 días (5 semanas Lun–Dom)
       const asist=[];
-      for(let d=0;d<30;d++){
+      for(let d=0;d<35;d++){
         const rnd=Math.random();
-        asist.push(rnd<0.78?'p':rnd<0.88?'a':'r');
+        // Domingos (índice 6, 13, 20, 27, 34) más probabilidad de descanso
+        const esDomingo=(d%7===6);
+        asist.push(esDomingo?(rnd<0.15?'p':rnd<0.25?'a':'r'):(rnd<0.78?'p':rnd<0.88?'a':'r'));
       }
 
       // Órdenes por día (para heatmap clickeable)
@@ -1442,9 +1449,9 @@ function renderFicha(t){
   const aCount=t.asistencia.filter(v=>v==='a').length;
   const rCount=t.asistencia.filter(v=>v==='r').length;
   document.getElementById('heatmap-legend').innerHTML=`
-    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-p"></span>Asistencia (${pCount})</span><span class="hm-leg-pct">${(pCount/30*100).toFixed(0)}%</span></div>
-    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-a"></span>Inasistencia (${aCount})</span><span class="hm-leg-pct" style="color:var(--red)">${(aCount/30*100).toFixed(0)}%</span></div>
-    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-r"></span>Descansos (${rCount})</span><span class="hm-leg-pct">${(rCount/30*100).toFixed(0)}%</span></div>`;
+    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-p"></span>Asistencia (${pCount})</span><span class="hm-leg-pct">${(pCount/35*100).toFixed(0)}%</span></div>
+    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-a"></span>Inasistencia (${aCount})</span><span class="hm-leg-pct" style="color:var(--red)">${(aCount/35*100).toFixed(0)}%</span></div>
+    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-r"></span>Descansos (${rCount})</span><span class="hm-leg-pct">${(rCount/35*100).toFixed(0)}%</span></div>`;
 
   // Desglose
   document.getElementById('desglose-body').innerHTML=`
@@ -1471,14 +1478,291 @@ function renderConfig(){
 }
 
 // ═══════════════════════════════════════════
+// EXCEL / SHAREPOINT LOADER
+// ═══════════════════════════════════════════
+
+// Mapeo de nombres de distrito del archivo real → clave estándar
+const DIST_MAP={
+  'IRAPUATO':'GS2-BAJ-IRA IRAPUATO','LEON':'GS2-BAJ-LON LEON','LEON C':'GS2-BAJ-LON LEON',
+  'COLIMA':'GS2-OCC-COL COLIMA','BARRANCA':'GS2-OCC-GDL BARRANCA',
+  'ESTADIO':'GS2-OCC-GDL ESTADIO','LOPEZ MATEOS':'GS2-OCC-GDL LOPEZ MATEOS',
+  'PRIMAVERA':'GS2-OCC-GDL PRIMAVERA','MORELIA':'GS2-OCC-MOR MORELIA',
+  'TEPIC':'GS2-OCC-TEP TEPIC','CANCUN':'GS2-SUR-CUN CANCUN 1','CANCUN 1':'GS2-SUR-CUN CANCUN 1',
+  'CORDOBA':'GS2-OTE-CBA CORDOBA ORIZABA','CORDOBA ORIZABA':'GS2-OTE-CBA CORDOBA ORIZABA',
+  'PUEBLA':'GS2-OTE-PUE PUEBLA','VERACRUZ':'GS2-OTE-VER VERACRUZ','XALAPA':'GS2-OTE-XAL XALAPA',
+  'AGUASCALIENTES':'GS2-OCC-AGS AGUASCALIENTES','TUXTLA':'GS2-SUR-TUX TUXTLA',
+  'MERIDA':'GS2-SUR-MER MERIDA',
+};
+// Mapeo de tipo cuadrilla del archivo real → clave interna
+const SKILL_MAP={'NORMAL':'Normal','PLANTA INTERNA':'Normal','MOTO':'Moto','HÍBRIDA':'Hibrida',
+  'HIBRIDA':'Hibrida','ELITE':'Elite','MULTIDISTRITO':'Multidistrito','MULTI':'Multidistrito'};
+
+function normDist(raw){
+  if(!raw)return null;
+  const u=raw.toString().toUpperCase().trim();
+  for(const [k,v] of Object.entries(DIST_MAP)){if(u.includes(k))return v;}
+  // buscar coincidencia parcial en claves de METAS
+  for(const k of Object.keys(METAS)){if(k.toUpperCase().includes(u)||u.includes(k.toUpperCase().replace('GS2-OCC-','').replace('GS2-BAJ-','').replace('GS2-OTE-','').replace('GS2-SUR-','').trim()))return k;}
+  return null;
+}
+function normSkill(raw){
+  if(!raw)return 'Normal';
+  const u=raw.toString().toUpperCase().trim();
+  return SKILL_MAP[u]||'Normal';
+}
+function excelDateToJS(v){
+  if(v instanceof Date)return v;
+  if(typeof v==='number'){const d=new Date((v-25569)*86400*1000);return d;}
+  if(typeof v==='string'){const d=new Date(v);return isNaN(d)?null:d;}
+  return null;
+}
+function getMondayOfWeek(date){
+  const d=new Date(date);
+  const day=d.getDay();
+  const diff=day===0?-6:1-day; // domingo retrocede 6, lunes=0
+  d.setDate(d.getDate()+diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+function weekKey(date){return getMondayOfWeek(date).toISOString().slice(0,10);}
+function formatWeekLabel(mondayDate){
+  const sun=new Date(mondayDate);sun.setDate(sun.getDate()+6);
+  const months=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  return `Lun ${mondayDate.getDate()} ${months[mondayDate.getMonth()]} – Dom ${sun.getDate()} ${months[sun.getMonth()]}`;
+}
+
+function loadExcelFile(input){
+  const file=input.files[0];
+  if(!file)return;
+  document.getElementById('load-btn-label').textContent='Cargando…';
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      processWorkbook(wb,file.name);
+    }catch(err){
+      alert('Error al leer el archivo: '+err.message);
+      document.getElementById('load-btn-label').textContent='Cargar Excel';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function processWorkbook(wb,filename){
+  // Usar primera hoja o la que tenga más filas
+  const sheetName=wb.SheetNames.find(s=>!s.toLowerCase().includes('glosario'))||wb.SheetNames[0];
+  const ws=wb.Sheets[sheetName];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+
+  if(!rows.length){alert('La hoja está vacía o sin datos.');return;}
+
+  // Detectar columnas (case-insensitive)
+  const sample=rows[0];
+  const colKey=k=>{
+    const keys=Object.keys(sample);
+    const found=keys.find(c=>c.toLowerCase().trim()===k.toLowerCase().trim());
+    return found||null;
+  };
+  const C={
+    nombre:    colKey('Nombre tecnico')||colKey('nombre tecnico'),
+    id:        colKey('Usuario instalador')||colKey('usuario instalador')||colKey('Número empleado'),
+    dist:      colKey('Glosario tecnico.SUCURSAL')||colKey('Distrito'),
+    skill:     colKey('Tipo de cuadrilla corregido')||colKey('Tipo cuadrilla'),
+    estrellas: colKey('Estrella'),
+    meta:      colKey('Meta estrellas'),
+    tipoDist:  colKey('Tipo distrito'),
+    fecha:     colKey('Fecha termino'),
+    coord:     colKey('Nombre coordinador'),
+    tipoSvc:   colKey('Tipo de servicio')||colKey('Tipo'),
+    os:        colKey('OS'),
+    ot:        colKey('OT'),
+    monto:     colKey('Monto pago')||colKey('Monto Bono técnico semanal'),
+    alcance:   colKey('Alcance'),
+  };
+
+  // Agrupar por técnico + semana
+  const tecSemana={};
+  rows.forEach(row=>{
+    const nombre=(row[C.nombre]||'').toString().trim();
+    const idTec=(row[C.id]||'').toString().trim();
+    if(!nombre&&!idTec)return;
+    const key=nombre||idTec;
+
+    const rawDist=row[C.dist]||'';
+    const dist=normDist(rawDist)||'GS2-OCC-GDL BARRANCA';
+    const skill=normSkill(row[C.skill]);
+    const stars=parseFloat(row[C.estrellas])||0;
+    const meta=parseFloat(row[C.meta])||84;
+    const tipoDist=(row[C.tipoDist]||'B').toString().trim().toUpperCase().startsWith('A')?'A':'B';
+    const rawFecha=row[C.fecha];
+    const fecha=excelDateToJS(rawFecha);
+    const wk=fecha?weekKey(fecha):'1970-01-01';
+    const tipoSvc=(row[C.tipoSvc]||'Soporte').toString().trim();
+    const osNum=(row[C.os]||'').toString().trim();
+    const otNum=(row[C.ot]||'').toString().trim();
+    const coordNombre=(row[C.coord]||'Sin asignar').toString().trim();
+
+    const compKey=key+'||'+wk;
+    if(!tecSemana[compKey]){
+      tecSemana[compKey]={
+        nombre:nombre||idTec, id:idTec||key, dist, skill, meta, tipoDist,
+        coordNombre, wk, totalStars:0, ordenes:[], fechas:new Set(),
+      };
+    }
+    const t=tecSemana[compKey];
+    t.totalStars+=stars;
+    if(fecha)t.fechas.add(fecha.toISOString().slice(0,10));
+    if(osNum||tipoSvc){
+      t.ordenes.push({os:osNum||'OS-?',ot:otNum||'OT-?',tipo:tipoSvc,estrellas:stars,
+        hora:fecha?fecha.toTimeString().slice(0,5):'00:00',fecha:fecha?fecha.toISOString().slice(0,10):wk});
+    }
+  });
+
+  // Obtener semanas únicas y ordenarlas
+  const allWeeks=[...new Set(Object.values(tecSemana).map(t=>t.wk))].sort();
+
+  // Construir allData desde los grupos
+  const newData=[];
+  const newCoords={};
+
+  Object.values(tecSemana).forEach((g,i)=>{
+    const metaInfo=METAS[g.dist]||{t:'B',N:84,Mo:70,H:84,E:84,Mu:84};
+    const skKey=SK_KEY[g.skill]||'N';
+    const meta=metaInfo[skKey]||metaInfo.N||84;
+    const tipo=g.tipoDist||metaInfo.t||'B';
+    const pct=meta>0?(g.totalStars/meta*100):0;
+    const dias=g.fechas.size;
+    const inas=Math.max(0,6-dias);
+    const bb=bonoBase(pct,tipo);
+    const b11=bono110(pct,g.totalStars,meta,tipo);
+    const desc=descuento(g.dist,inas,bb,b11);
+    const bf=Math.max(0,bb+b11-desc);
+
+    // Historial placeholder (5 semanas con datos reales si existen)
+    const hist=Array.from({length:10},()=>r(500,2500));
+
+    // Asistencia por día (35 días, rellenar con real data)
+    const asist=Array.from({length:35},(_,di)=>{
+      const esDomingo=di%7===6;
+      return esDomingo?'r':(Math.random()<0.78?'p':Math.random()<0.88?'a':'r');
+    });
+
+    // Órdenes por día (agrupar por fecha dentro de la semana)
+    const ordersByDay={};
+    const mondayOfWk=getMondayOfWeek(new Date(g.wk));
+    g.ordenes.forEach(o=>{
+      if(!o.fecha)return;
+      const oDate=new Date(o.fecha);
+      const diffDays=Math.round((oDate-mondayOfWk)/(1000*60*60*24));
+      if(diffDays>=0&&diffDays<7){
+        asist[diffDays]='p';
+        if(!ordersByDay[diffDays])ordersByDay[diffDays]=[];
+        ordersByDay[diffDays].push(o);
+      }
+    });
+    Object.keys(ordersByDay).forEach(d=>{
+      ordersByDay[d].sort((a,b)=>a.hora.localeCompare(b.hora));
+    });
+
+    // Coordinador
+    const cid='COORD-REAL-'+g.coordNombre.replace(/\s/g,'_');
+    if(!newCoords[cid])newCoords[cid]={id:cid,nombre:g.coordNombre,distrito:g.dist,tecnicosIds:[],ordenesSem:0,alcanceMeta:0,_sumPct:0,_n:0};
+    newCoords[cid].tecnicosIds.push('TEC-R-'+String(i+1).padStart(4,'0'));
+    newCoords[cid].ordenesSem+=g.ordenes.length;
+    newCoords[cid]._sumPct+=pct;
+    newCoords[cid]._n++;
+
+    newData.push({
+      id:'TEC-R-'+String(i+1).padStart(4,'0'),
+      nombre:g.nombre, coordId:cid, coordNombre:g.coordNombre,
+      distrito:g.dist, skill:g.skill, meta, tipo, estrellas:g.totalStars,
+      pct, dias, inas, bonoBase:bb, bono110:b11, descuento:desc, bonoFinal:bf,
+      historial:hist, asistencia:asist, ordersByDay,
+      especialidad:'FIBRA ÓPTICA', edad:r(22,48), exp:`${r(1,9)} años`,
+      semana:g.wk,
+    });
+  });
+
+  // Finalizar coordinadores
+  const newCoordArr=Object.values(newCoords).map(c=>{
+    c.alcanceMeta=c._n>0?Math.round(c._sumPct/c._n):0;
+    c.prodProm=(c.ordenesSem/(c.tecnicosIds.length||1)/6).toFixed(1);
+    return c;
+  });
+
+  // Reemplazar datos globales
+  window._allRealData=newData;
+  allData=newData;
+  coordData=newCoordArr;
+
+  // Actualizar selector de semanas
+  const weekSel=document.getElementById('week-sel');
+  weekSel.innerHTML=allWeeks.map((wk,i)=>{
+    const mon=new Date(wk);
+    return `<option value="WK_${i}" data-wk="${wk}">${formatWeekLabel(mon)}</option>`;
+  }).join('');
+  // Guardar semanas para filtrado posterior
+  window._realWeeks=allWeeks;
+  window._currentRealWk=allWeeks[allWeeks.length-1]||null;
+
+  // Filtrar datos a la última semana
+  if(window._currentRealWk){
+    allData=newData.filter(t=>t.semana===window._currentRealWk);
+    weekSel.value='WK_'+(allWeeks.length-1);
+  }
+
+  // Actualizar UI
+  document.getElementById('source-label').textContent=filename;
+  document.getElementById('load-btn-label').textContent='Actualizar';
+  renderNacional();
+  if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
+  if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
+  if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
+  alert(`✅ Datos cargados: ${newData.length} registros técnico-semana de ${allWeeks.length} semana(s).`);
+}
+
+// Override changeWeek para datos reales
+const _origChangeWeek=function(w){
+  currentWeek=parseInt(w);
+  coordData=[];
+  generateData(currentWeek);
+  renderNacional();
+  if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
+  if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
+  if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
+};
+
+function changeWeek(wOrIdx){
+  // Si hay datos reales cargados, filtrar por semana
+  if(window._realWeeks&&window._realWeeks.length){
+    const sel=document.getElementById('week-sel');
+    const opt=sel.options[sel.selectedIndex];
+    const wk=opt?opt.getAttribute('data-wk'):null;
+    if(wk){
+      window._currentRealWk=wk;
+      // Recargar allData filtrado por semana
+      // (necesitamos _allRealData para esto)
+      if(window._allRealData){
+        allData=window._allRealData.filter(t=>t.semana===wk);
+      }
+      renderNacional();
+      if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
+      if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
+      return;
+    }
+  }
+  _origChangeWeek(wOrIdx);
+}
+
+// ═══════════════════════════════════════════
 // DAY DETAIL (Heatmap)
 // ═══════════════════════════════════════════
 function showDayDetail(dayIdx){
   const orders=window._curOrdersByDay[dayIdx];
   if(!orders||!orders.length)return;
-  const weekDays=['Lun','Mar','Mié','Jue','Vie','Sáb'];
-  const weekNum=Math.floor(dayIdx/6)+1;
-  const dayName=weekDays[dayIdx%6];
+  const weekDays=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const weekNum=Math.floor(dayIdx/7)+1;
+  const dayName=weekDays[dayIdx%7];
   const totalStars=orders.reduce((s,o)=>s+o.estrellas,0);
   document.getElementById('day-detail-title').innerHTML=
     `<span style="color:var(--or)">Semana ${weekNum} — ${dayName}</span> &nbsp;·&nbsp; ${orders.length} órdenes &nbsp;·&nbsp; <span style="color:var(--green)">⭐ ${totalStars} estrellas</span>`;
