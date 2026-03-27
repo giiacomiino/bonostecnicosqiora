@@ -762,7 +762,7 @@ const METAS={
 };
 const BONOS={A:{'80':500,'90':900,'100':2500},B:{'80':450,'90':800,'100':1800}};
 const DESC_D=new Set(['CTA-TPI-INT-IRA IRAPUATO','CTA-TPI-INT-LON LEON','CTA-TPI-INT-GBA GDL BARRANCA','CTA-TPI-INT-GES GDL ESTADIO','CTA-TPI-INT-GLM GDL LOPEZ MATEOS','CTA-TPI-INT-GPR GDL PRIMAVERA']);
-const SERVICIOS=[['Instalación',4],['Soporte',2],['Mantenimiento Mayor',3],['Mantenimiento Menor',2],['Addons',2],['Cambio De Domicilio',3],['Cambio De Equipo',2],['Empresarial',5],['Recolección Pi',1],['Recolección',1],['Cambio De Plan',2],['Factibilidad',2],['Hallazgo Empresarial',3]];
+const SERVICIOS=[['Instalación',6],['Soporte',3],['Mantenimiento Mayor',4],['Mantenimiento',3],['Addons',2],['Cambio De Domicilio',6],['Cambio De Equipo',2],['Soporte Empresarial',5],['Instalación Empresarial',8],['Recolección Pi',1],['Recolección',1],['Cambio De Plan',2],['Factibilidad',1],['No Aplica',0]];
 const SKILLS=['Normal','Moto','Hibrida','Elite','Multidistrito'];
 const SK_KEY={Normal:'N',Moto:'Mo',Hibrida:'H',Elite:'E',Multidistrito:'Mu'};
 const SK_CLASS={Normal:'sp-N',Moto:'sp-Mo',Hibrida:'sp-H',Elite:'sp-E',Multidistrito:'sp-Mu'};
@@ -1650,10 +1650,14 @@ function normSkill(raw){
   return SKILL_MAP[u]||'Normal';
 }
 function excelDateToJS(v){
-  if(v instanceof Date)return v;
-  if(typeof v==='number'){const d=new Date((v-25569)*86400*1000);return d;}
-  if(typeof v==='string'){const d=new Date(v);return isNaN(d)?null:d;}
-  return null;
+  let d;
+  if(v instanceof Date){d=new Date(v);}
+  else if(typeof v==='number'){d=new Date((v-25569)*86400*1000);}
+  else if(typeof v==='string'&&v.trim()){d=new Date(v.trim());}
+  else return null;
+  if(isNaN(d.getTime()))return null;
+  d.setHours(12,0,0,0); // normalizar a mediodía para evitar desfases de zona horaria
+  return d;
 }
 function getMondayOfWeek(date){
   const d=new Date(date);
@@ -1688,137 +1692,189 @@ function loadExcelFile(input){
 }
 
 function processWorkbook(wb,filename){
-  // Usar primera hoja o la que tenga más filas
-  const sheetName=wb.SheetNames.find(s=>!s.toLowerCase().includes('glosario'))||wb.SheetNames[0];
+  const sheetName=wb.SheetNames[0];
   const ws=wb.Sheets[sheetName];
-  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
 
-  if(!rows.length){alert('La hoja está vacía o sin datos.');return;}
+  // Leer como arrays para manejar encabezados duplicados (Distrito, Auxiliar)
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',cellDates:true});
+  if(raw.length<2){alert('La hoja está vacía o sin datos.');return;}
 
-  // Detectar columnas (case-insensitive)
-  const sample=rows[0];
-  const colKey=k=>{
-    const keys=Object.keys(sample);
-    const found=keys.find(c=>c.toLowerCase().trim()===k.toLowerCase().trim());
-    return found||null;
-  };
+  const headers=raw[0].map(h=>(h||'').toString().trim());
+  const dataRows=raw.slice(1);
+
+  // Encontrar índice de columna (primera aparición)
+  const col=name=>headers.indexOf(name);
+  // Encontrar todos los índices de un nombre (para duplicados)
+  const colAll=name=>headers.reduce((a,h,i)=>h===name?[...a,i]:a,[]);
+
+  // Mapa de columnas exacto para intento.xlsx
+  // Col 0:Cuenta 1:OS 2:OT 3:Tipo 4:SubTipo 5:Ciudad 6:Distrito(1) 7:Cluster
+  // 8:Empresa 9:Tipo Cuadrilla 10:No. FFM 11:Tecnico 12:Auxiliar(1) 13:Auxiliar(2)
+  // 14:Fecha Termino 15:Estatus 16:Estado 17:Usuario para pago
+  // 18:TIPO DE CUADRILLA 19:PUNTOS 20:Servicio 21:Distrito(2=CTA-TPI-INT)
+  const distCols=colAll('Distrito');
   const C={
-    nombre:    colKey('Nombre tecnico')||colKey('nombre tecnico'),
-    id:        colKey('Usuario instalador')||colKey('usuario instalador')||colKey('Número empleado'),
-    dist:      colKey('Glosario tecnico.SUCURSAL')||colKey('Distrito'),
-    skill:     colKey('Tipo de cuadrilla corregido')||colKey('Tipo cuadrilla'),
-    estrellas: colKey('Estrella'),
-    meta:      colKey('Meta estrellas'),
-    tipoDist:  colKey('Tipo distrito'),
-    fecha:     colKey('Fecha termino'),
-    coord:     colKey('Nombre coordinador'),
-    tipoSvc:   colKey('Tipo de servicio')||colKey('Tipo'),
-    os:        colKey('OS'),
-    ot:        colKey('OT'),
-    monto:     colKey('Monto pago')||colKey('Monto Bono técnico semanal'),
-    alcance:   colKey('Alcance'),
+    nombre:  col('Tecnico'),
+    ffm:     col('No. FFM')!==-1?col('No. FFM'):col('Usuario para pago'),
+    dist1:   distCols.length>1?distCols[1]:distCols[0], // 2nd Distrito = CTA-TPI-INT-*
+    skill:   col('TIPO DE CUADRILLA'),       // clasificación de pago
+    puntos:  col('PUNTOS'),                  // ya calculados
+    fecha:   col('Fecha Termino'),
+    os:      col('OS'),
+    ot:      col('OT'),
+    tipo:    col('Tipo'),
+    servicio:col('Servicio'),
   };
 
-  // Agrupar por técnico + semana
-  const tecSemana={};
-  rows.forEach(row=>{
-    const nombre=(row[C.nombre]||'').toString().trim();
-    const idTec=(row[C.id]||'').toString().trim();
-    if(!nombre&&!idTec)return;
-    const key=nombre||idTec;
+  const clean=v=>(v||'').toString().replace(/[\n\t\r]+/g,' ').replace(/\s+/g,' ').trim();
 
-    const rawDist=row[C.dist]||'';
-    const dist=normDist(rawDist)||Object.keys(METAS)[0];
-    const skill=normSkill(row[C.skill]);
-    const stars=parseFloat(row[C.estrellas])||0;
-    const meta=parseFloat(row[C.meta])||84;
-    const tipoDist=(row[C.tipoDist]||'B').toString().trim().toUpperCase().startsWith('A')?'A':'B';
+  // Paso 1: recolectar TODAS las órdenes por técnico (clave = FFM)
+  const techMap={};
+  let minDate=null, maxDate=null;
+
+  dataRows.forEach(row=>{
+    const ffm    =clean(row[C.ffm]);
+    const nombre =clean(row[C.nombre]);
+    if(!ffm&&!nombre)return;
+    const techKey=ffm||nombre;
+
     const rawFecha=row[C.fecha];
     const fecha=excelDateToJS(rawFecha);
-    const wk=fecha?weekKey(fecha):'1970-01-01';
-    const tipoSvc=(row[C.tipoSvc]||'Soporte').toString().trim();
-    const osNum=(row[C.os]||'').toString().trim();
-    const otNum=(row[C.ot]||'').toString().trim();
-    const coordNombre=(row[C.coord]||'Sin asignar').toString().trim();
+    if(!fecha)return;
 
-    const compKey=key+'||'+wk;
-    if(!tecSemana[compKey]){
-      tecSemana[compKey]={
-        nombre:nombre||idTec, id:idTec||key, dist, skill, meta, tipoDist,
-        coordNombre, wk, totalStars:0, ordenes:[], fechas:new Set(),
-      };
+    const rawDist=clean(row[C.dist1]||'');
+    // Distrito.1 ya viene en formato CTA-TPI-INT; verificar directamente en METAS
+    const dist=METAS[rawDist]?rawDist:(normDist(rawDist)||Object.keys(METAS)[0]);
+    const skill=normSkill(clean(row[C.skill]||''));
+    const puntos=parseFloat(row[C.puntos])||0;
+    const osNum =clean(row[C.os]||'');
+    const otNum =clean(row[C.ot]||'');
+    const tipo  =clean(row[C.tipo]||row[C.servicio]||'Soporte');
+    const wk    =weekKey(fecha);
+    // Usar fecha local (evitar toISOString que usa UTC)
+    const dia   =fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0')+'-'+String(fecha.getDate()).padStart(2,'0');
+
+    if(!techMap[techKey]){
+      techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,orders:[]};
     }
-    const t=tecSemana[compKey];
-    t.totalStars+=stars;
-    if(fecha)t.fechas.add(fecha.toISOString().slice(0,10));
-    if(osNum||tipoSvc){
-      t.ordenes.push({os:osNum||'OS-?',ot:otNum||'OT-?',tipo:tipoSvc,estrellas:stars,
-        hora:fecha?fecha.toTimeString().slice(0,5):'00:00',fecha:fecha?fecha.toISOString().slice(0,10):wk});
-    }
+    // Actualizar dist/skill con valor concreto (no default) cuando se encuentre
+    if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
+
+    techMap[techKey].orders.push({fecha,puntos,os:osNum,ot:otNum,tipo,wk,dia});
+
+    if(!minDate||fecha<minDate)minDate=fecha;
+    if(!maxDate||fecha>maxDate)maxDate=fecha;
   });
 
-  // Obtener semanas únicas y ordenarlas
-  const allWeeks=[...new Set(Object.values(tecSemana).map(t=>t.wk))].sort();
+  const allWeeks=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))].sort();
 
-  // Construir allData desde los grupos
+  // Inicio del heatmap de 35 días: lunes de la primera semana en los datos
+  const hmStart=getMondayOfWeek(minDate||new Date());
+
+  // Paso 2: construir registros por técnico × semana
   const newData=[];
   const newCoords={};
 
-  Object.values(tecSemana).forEach((g,i)=>{
-    const metaInfo=METAS[g.dist]||{t:'B',N:84,Mo:70,H:84,E:84,Mu:84};
-    const skKey=SK_KEY[g.skill]||'N';
-    const meta=metaInfo[skKey]||metaInfo.N||84;
-    const tipo=g.tipoDist||metaInfo.t||'B';
-    const pct=meta>0?(g.totalStars/meta*100):0;
-    const dias=g.fechas.size;
-    const inas=Math.max(0,6-dias);
-    const bb=bonoBase(pct,tipo);
-    const b11=bono110(pct,g.totalStars,meta,tipo);
-    const desc=descuento(g.dist,inas,bb,b11);
-    const bf=Math.max(0,bb+b11-desc);
-
-    // Historial placeholder (5 semanas con datos reales si existen)
-    const hist=Array.from({length:10},()=>r(500,2500));
-
-    // Asistencia por día (35 días, rellenar con real data)
-    const asist=Array.from({length:35},(_,di)=>{
-      const esDomingo=di%7===6;
-      return esDomingo?'r':(Math.random()<0.78?'p':Math.random()<0.88?'a':'r');
+  Object.values(techMap).forEach(tech=>{
+    // Agrupar órdenes por semana
+    const byWk={};
+    tech.orders.forEach(o=>{
+      if(!byWk[o.wk])byWk[o.wk]={puntos:0,diasSet:new Set(),ordenes:[]};
+      byWk[o.wk].puntos+=o.puntos;
+      const dow=o.fecha.getDay(); // 0=Dom, 1=Lun … 6=Sáb
+      if(dow!==0)byWk[o.wk].diasSet.add(o.dia); // solo días Lun-Sáb como presencia laboral
+      byWk[o.wk].ordenes.push(o);
     });
 
-    // Órdenes por día (agrupar por fecha dentro de la semana)
-    const ordersByDay={};
-    const mondayOfWk=getMondayOfWeek(new Date(g.wk));
-    g.ordenes.forEach(o=>{
-      if(!o.fecha)return;
-      const oDate=new Date(o.fecha);
-      const diffDays=Math.round((oDate-mondayOfWk)/(1000*60*60*24));
-      if(diffDays>=0&&diffDays<7){
-        asist[diffDays]='p';
-        if(!ordersByDay[diffDays])ordersByDay[diffDays]=[];
-        ordersByDay[diffDays].push(o);
+    // Heatmap 35 días: historial completo del técnico
+    const techDaySet=new Set(tech.orders.map(o=>o.dia));
+    const asist=[];
+    const ordersByDayFull={};
+    for(let di=0;di<35;di++){
+      const d=new Date(hmStart);d.setDate(d.getDate()+di);
+      const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      const dow=d.getDay();
+      if(dow===0){asist.push('r');}
+      else if(techDaySet.has(dStr)){
+        asist.push('p');
+        const dayOrds=tech.orders.filter(o=>o.dia===dStr).sort((a,b)=>a.fecha-b.fecha);
+        if(dayOrds.length){
+          ordersByDayFull[di]=dayOrds.map(o=>({
+            os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,estrellas:o.puntos,
+            hora:o.fecha.toTimeString().slice(0,5),fecha:dStr
+          }));
+        }
+      }else{
+        const inRange=d>=minDate&&d<=maxDate;
+        asist.push(inRange?'a':'r');
       }
-    });
-    Object.keys(ordersByDay).forEach(d=>{
-      ordersByDay[d].sort((a,b)=>a.hora.localeCompare(b.hora));
-    });
+    }
 
-    // Coordinador
-    const cid='COORD-REAL-'+g.coordNombre.replace(/\s/g,'_');
-    if(!newCoords[cid])newCoords[cid]={id:cid,nombre:g.coordNombre,distrito:g.dist,tecnicosIds:[],ordenesSem:0,alcanceMeta:0,_sumPct:0,_n:0};
-    newCoords[cid].tecnicosIds.push('TEC-R-'+String(i+1).padStart(4,'0'));
-    newCoords[cid].ordenesSem+=g.ordenes.length;
-    newCoords[cid]._sumPct+=pct;
-    newCoords[cid]._n++;
+    // Metainfo del técnico
+    const metaInfo=METAS[tech.dist]||{t:'B',N:84,Mo:70,H:84,E:84,Mu:84};
+    const skKey=SK_KEY[tech.skill]||'N';
+    const meta=metaInfo[skKey]||metaInfo.N||84;
+    const tipo=metaInfo.t||'B';
 
-    newData.push({
-      id:'TEC-R-'+String(i+1).padStart(4,'0'),
-      nombre:g.nombre, coordId:cid, coordNombre:g.coordNombre,
-      distrito:g.dist, skill:g.skill, meta, tipo, estrellas:g.totalStars,
-      pct, dias, inas, bonoBase:bb, bono110:b11, descuento:desc, bonoFinal:bf,
-      historial:hist, asistencia:asist, ordersByDay,
-      especialidad:'FIBRA ÓPTICA', edad:r(22,48), exp:`${r(1,9)} años`,
-      semana:g.wk,
+    // Historial de bonos base por semana (para gráfica)
+    const histAll=allWeeks.map(wk=>{
+      const wd=byWk[wk];if(!wd)return 0;
+      return Math.max(0,bonoBase(wd.puntos/meta*100,tipo));
+    });
+    while(histAll.length<10)histAll.unshift(0);
+    histAll.splice(10);
+
+    // Coordinador: uno por distrito
+    const cid='COORD-'+tech.dist.replace(/[^a-z0-9]/gi,'_');
+    if(!newCoords[cid]){
+      newCoords[cid]={id:cid,nombre:'Coord. '+distShort(tech.dist),
+        distrito:tech.dist,tecnicosIds:[],ordenesSem:0,alcanceMeta:0,_sumPct:0,_n:0};
+    }
+    const tecId='TEC-R-'+tech.ffm;
+    if(!newCoords[cid].tecnicosIds.includes(tecId))newCoords[cid].tecnicosIds.push(tecId);
+
+    // Un registro por semana que el técnico trabajó
+    allWeeks.forEach(wk=>{
+      const g=byWk[wk];
+      if(!g)return; // este técnico no tiene registros esta semana
+
+      const pct=meta>0?(g.puntos/meta*100):0;
+      const dias=g.diasSet.size;
+      const inas=Math.max(0,6-dias);
+      const bb =bonoBase(pct,tipo);
+      const b11=bono110(pct,g.puntos,meta,tipo);
+      const desc=descuento(tech.dist,inas,bb,b11);
+      const bf =Math.max(0,bb+b11-desc);
+
+      newCoords[cid].ordenesSem+=g.ordenes.length;
+      newCoords[cid]._sumPct+=pct;
+      newCoords[cid]._n++;
+
+      // ordersByDay relativo al lunes de esta semana (para tab de día en heatmap)
+      const wkMon=getMondayOfWeek(new Date(wk+'T12:00:00'));
+      const ordersByDay={};
+      g.ordenes.forEach(o=>{
+        const diff=Math.round((o.fecha-wkMon)/86400000);
+        if(diff>=0&&diff<7){
+          if(!ordersByDay[diff])ordersByDay[diff]=[];
+          ordersByDay[diff].push({os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,
+            estrellas:o.puntos,hora:o.fecha.toTimeString().slice(0,5),fecha:o.dia});
+        }
+      });
+      Object.values(ordersByDay).forEach(arr=>arr.sort((a,b)=>a.hora.localeCompare(b.hora)));
+
+      newData.push({
+        id:tecId, nombre:tech.nombre,
+        coordId:cid, coordNombre:newCoords[cid].nombre,
+        distrito:tech.dist, skill:tech.skill, meta, tipo,
+        estrellas:g.puntos, pct, dias, inas,
+        bonoBase:bb, bono110:b11, descuento:desc, bonoFinal:bf,
+        historial:histAll.slice(),
+        asistencia:asist,       // historial completo 35 días
+        ordersByDay:ordersByDayFull, // usar historial completo para clicks en heatmap
+        especialidad:'FIBRA ÓPTICA', edad:30, exp:'—',
+        semana:wk,
+      });
     });
   });
 
@@ -1829,68 +1885,58 @@ function processWorkbook(wb,filename){
     return c;
   });
 
-  // Reemplazar datos globales
   window._allRealData=newData;
+  window._techMap=techMap;
   allData=newData;
   coordData=newCoordArr;
 
-  // Actualizar selector de semanas
+  // Selector de semanas
   const weekSel=document.getElementById('week-sel');
   weekSel.innerHTML=allWeeks.map((wk,i)=>{
-    const mon=new Date(wk);
-    return `<option value="WK_${i}" data-wk="${wk}">${formatWeekLabel(mon)}</option>`;
+    return `<option value="WK_${i}" data-wk="${wk}">${formatWeekLabel(getMondayOfWeek(new Date(wk+'T12:00:00')))}</option>`;
   }).join('');
-  // Guardar semanas para filtrado posterior
   window._realWeeks=allWeeks;
   window._currentRealWk=allWeeks[allWeeks.length-1]||null;
 
-  // Filtrar datos a la última semana
+  // Filtrar a última semana por defecto
   if(window._currentRealWk){
     allData=newData.filter(t=>t.semana===window._currentRealWk);
     weekSel.value='WK_'+(allWeeks.length-1);
   }
 
-  // Actualizar UI
   document.getElementById('source-label').textContent=filename;
   document.getElementById('load-btn-label').textContent='Actualizar';
   renderNacional();
   if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
   if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
   if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
-  alert(`✅ Datos cargados: ${newData.length} registros técnico-semana de ${allWeeks.length} semana(s).`);
+
+  const nTecs=Object.keys(techMap).length;
+  const nOrds=Object.values(techMap).reduce((s,t)=>s+t.orders.length,0);
+  alert(`✅ Datos cargados exitosamente\n\nTécnicos: ${nTecs} | Órdenes: ${nOrds.toLocaleString()}\nSemanas: ${allWeeks.length}`);
 }
 
-// Override changeWeek para datos reales
-const _origChangeWeek=function(w){
-  currentWeek=parseInt(w);
-  coordData=[];
-  generateData(currentWeek);
-  renderNacional();
-  if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
-  if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
-  if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
-};
-
 function changeWeek(wOrIdx){
-  // Si hay datos reales cargados, filtrar por semana
   if(window._realWeeks&&window._realWeeks.length){
     const sel=document.getElementById('week-sel');
     const opt=sel.options[sel.selectedIndex];
     const wk=opt?opt.getAttribute('data-wk'):null;
-    if(wk){
+    if(wk&&window._allRealData){
       window._currentRealWk=wk;
-      // Recargar allData filtrado por semana
-      // (necesitamos _allRealData para esto)
-      if(window._allRealData){
-        allData=window._allRealData.filter(t=>t.semana===wk);
-      }
+      allData=window._allRealData.filter(t=>t.semana===wk);
       renderNacional();
       if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
+      if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
       if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
       return;
     }
   }
-  _origChangeWeek(wOrIdx);
+  // Mock data: regenerar
+  currentWeek=parseInt(wOrIdx);coordData=[];generateData(currentWeek);
+  renderNacional();
+  if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
+  if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
+  if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
 }
 
 // ═══════════════════════════════════════════
