@@ -980,8 +980,15 @@ async function loadFromSupabase(){
   document.getElementById('week-sel').innerHTML='<option value="">— cargando —</option>';
   document.getElementById('source-label').textContent='Cargando…';
   document.getElementById('source-label').style.color='var(--text3)';
-  renderNacional();
+  try{ renderNacional(); }catch(_){}
   try{
+    // Test connection first with a fast head request (15s timeout)
+    const testCtrl=new AbortController();
+    const testTimer=setTimeout(()=>testCtrl.abort(),15000);
+    const testResp=await _sb.from('orders').select('id',{count:'exact',head:true});
+    clearTimeout(testTimer);
+    if(testResp.error)throw testResp.error;
+
     // Fetch in pages of 5000 to avoid limits
     let all=[], from=0, page=5000;
     while(true){
@@ -1046,7 +1053,10 @@ async function loadFromSupabase(){
     setSbStatus(`✓ ${all.length.toLocaleString()} órdenes cargadas`,true);
     renderAll();
   }catch(err){
-    setSbStatus('Error: '+err.message,false);
+    const msg=err.name==='AbortError'||err.message?.includes('aborted')
+      ?'Sin respuesta (proyecto pausado o sin conexión)'
+      :'Error: '+err.message;
+    setSbStatus(msg,false);
     console.error('Supabase load error:',err);
   }
 }
