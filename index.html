@@ -325,7 +325,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       <span id="load-btn-label">Subir Excel → Supabase</span>
     </button>
     <div id="data-source-info" style="margin-top:8px;font-size:10px;color:var(--text3);text-align:center;line-height:1.4">
-      Datos: <span id="source-label" style="color:var(--or);font-weight:600">Demo (mock)</span>
+      Datos: <span id="source-label" style="color:var(--text3);font-weight:600">Sin datos</span>
     </div>
   </div>
 </nav>
@@ -350,10 +350,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
         </select>
         <span style="color:var(--border);margin:0 2px;font-size:16px;line-height:1">|</span>
         <select id="week-sel" onchange="changeWeek(this.value)">
-          <option value="0">Sem 1 — 29 Dic–4 Ene</option>
-          <option value="1">Sem 2 — 5 Ene–11 Ene</option>
-          <option value="2" selected>Sem 3 — 12 Ene–18 Ene</option>
-          <option value="3">Sem 4 — 19 Ene–25 Ene</option>
+          <option value="">— cargando —</option>
         </select>
         <select id="month-sel" style="display:none;border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;outline:none" onchange="changeMonth(this.value)"></select>
       </div>
@@ -835,6 +832,12 @@ function setSbStatus(msg,ok){
 
 async function loadFromSupabase(){
   setSbStatus('Conectando…',null);
+  // Mostrar estado vacío mientras carga
+  allData=[];coordData=[];
+  document.getElementById('week-sel').innerHTML='<option value="">— cargando —</option>';
+  document.getElementById('source-label').textContent='Cargando…';
+  document.getElementById('source-label').style.color='var(--text3)';
+  renderNacional();
   try{
     // Fetch in pages of 5000 to avoid limits
     let all=[], from=0, page=5000;
@@ -846,7 +849,13 @@ async function loadFromSupabase(){
       if(data.length<page)break;
       from+=page;
     }
-    if(all.length===0){setSbStatus('Sin datos — sube un Excel primero',false);return;}
+    if(all.length===0){
+      document.getElementById('week-sel').innerHTML='<option value="">Sin semanas</option>';
+      document.getElementById('source-label').textContent='Sin datos';
+      document.getElementById('source-label').style.color='var(--text3)';
+      setSbStatus('Sin datos — sube un Excel primero',false);
+      return;
+    }
 
     const techMap={};
     let minDate=null,maxDate=null;
@@ -887,7 +896,9 @@ async function loadFromSupabase(){
 
     rebuildFromRawOrders();
     const nT=Object.keys(techMap).length;
-    document.getElementById('source-label').textContent=`Supabase (${nT} técnicos, ${all.length.toLocaleString()} órdenes)`;
+    const slEl=document.getElementById('source-label');
+    slEl.textContent=`Supabase · ${nT} técnicos · ${all.length.toLocaleString()} órdenes`;
+    slEl.style.color='var(--or)';
     document.getElementById('load-btn-label').textContent='Actualizar Excel';
     setSbStatus(`✓ ${all.length.toLocaleString()} órdenes cargadas`,true);
     renderAll();
