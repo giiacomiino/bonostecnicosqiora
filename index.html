@@ -73,6 +73,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);displ
 /* KPI CARDS */
 .kpi-row{display:grid;gap:14px;margin-bottom:18px}
 .kpi-5{grid-template-columns:repeat(5,1fr)}
+.kpi-6{grid-template-columns:repeat(6,1fr)}
 .kpi-4{grid-template-columns:repeat(4,1fr)}
 .kpi-c{background:var(--card);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);border:1.5px solid transparent;position:relative;overflow:hidden}
 .kpi-c.hl{border-color:var(--or)}
@@ -375,7 +376,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     <!-- ══════ VIEW: NACIONAL ══════ -->
     <div class="view active" id="view-nacional">
 
-      <div class="kpi-row kpi-5" id="kpi-nacional">
+      <div class="kpi-row kpi-6" id="kpi-nacional">
         <!-- rendered by JS -->
       </div>
 
@@ -389,17 +390,41 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
           <div style="height:240px"><canvas id="chart-funnel-os"></canvas></div>
         </div>
 
-        <!-- Cobertura tendencia -->
+        <!-- Tendencia: Bonos + OS -->
         <div class="cc">
           <div class="cc-head">
-            <div><div class="cc-title">Cobertura de Bono & Cuadrillas Activas</div><div class="cc-sub">Últimas 10 semanas · doble eje</div></div>
+            <div><div class="cc-title">Bonos Pagados & Órdenes Realizadas</div><div class="cc-sub">Últimas 10 semanas</div></div>
             <div style="display:flex;gap:10px;font-size:11px;align-items:center">
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#E85420;display:inline-block;border-radius:2px"></span>Cobertura %</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#2563EB;display:inline-block;border-radius:2px;border-top:2px dashed #2563EB"></span>Cuadrillas Activas</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:10px;background:#E85420;border-radius:2px;display:inline-block"></span>Bonos $</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#2563EB;display:inline-block;border-radius:2px"></span>Órdenes</span>
             </div>
           </div>
-          <div style="height:220px"><canvas id="chart-trend"></canvas></div>
+          <div style="height:220px"><canvas id="chart-trend-vol"></canvas></div>
+        </div>
+      </div>
+
+      <div class="g2 mb">
+        <!-- Tendencia: Cobertura + Productividad -->
+        <div class="cc">
+          <div class="cc-head">
+            <div><div class="cc-title">Cobertura de Bono & Productividad</div><div class="cc-sub">Últimas 10 semanas · doble eje</div></div>
+            <div style="display:flex;gap:10px;font-size:11px;align-items:center">
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#E85420;display:inline-block;border-radius:2px"></span>Cobertura %</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#16A34A;display:inline-block;border-radius:2px"></span>Productividad</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:2px;background:#2563EB;display:inline-block;border-radius:2px;border-top:2px dashed #2563EB"></span>Cuadrillas</span>
+            </div>
+          </div>
+          <div style="height:210px"><canvas id="chart-trend"></canvas></div>
           <div class="stat-pair" id="stat-pair-trend"></div>
+        </div>
+
+        <!-- Análisis de Sensibilidad -->
+        <div class="cc">
+          <div class="cc-head">
+            <div><div class="cc-title">Análisis por Nivel de Alcance</div><div class="cc-sub">Distribución de cuadrillas activas · semana actual</div></div>
+            <span class="chip chip-gy">SENSIBILIDAD</span>
+          </div>
+          <div id="sens-table-wrap"></div>
         </div>
       </div>
 
@@ -620,6 +645,9 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
         <div class="tec-profile" id="tec-profile-card"></div>
 
         <div class="kpi-row kpi-4" id="kpi-ficha"></div>
+
+        <!-- Barra de progreso de estrellas -->
+        <div class="cc mb" id="star-progress-card"></div>
 
         <div class="g2 mb">
           <!-- Histórico bonos -->
@@ -1042,7 +1070,7 @@ function changeSkill(v){
 let tecSearch='', tecDist='', tecSkill='', tecLevel='';
 let distSearch='', distType='';
 let coordSearch='', coordDist='';
-let chartTrend=null, chartCascade=null, chartOsDist=null, chartHistorico=null, chartFunnelOS=null;
+let chartTrend=null, chartTrendVol=null, chartCascade=null, chartOsDist=null, chartHistorico=null, chartFunnelOS=null;
 
 function r(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 function ch(a){return a[Math.floor(Math.random()*a.length)];}
@@ -1222,10 +1250,13 @@ function renderNacional(){
   const cobPct=activas>0?(conBono/activas*100).toFixed(1):'0';
   const cobColor=parseFloat(cobPct)>=80?'gr':parseFloat(cobPct)>=50?'or':'rd';
 
+  const con100=fd.filter(t=>t.pct>=100&&t.nOrdenes>0).length;
+  const pct100=activas>0?(con100/activas*100).toFixed(1):'0';
+
   document.getElementById('kpi-nacional').innerHTML=`
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)"><svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>MONTO TOTAL BONOS</div>
       <div class="kpi-val or">${fk(totalBonos)}</div>
-      <div class="kpi-sub" style="color:var(--text3)">${total} técnicos · semana actual</div></div>
+      <div class="kpi-sub" style="color:var(--text3)">${total} técnicos en período</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>CUADRILLAS ACTIVAS</div>
       <div class="kpi-val dk">${activas.toLocaleString()}</div>
@@ -1237,11 +1268,15 @@ function renderNacional(){
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>PRODUCTIVIDAD PROM.</div>
       <div class="kpi-val dk">${prodProm}</div>
-      <div class="kpi-sub">OS / cuadrilla activa / día</div></div>
+      <div class="kpi-sub">OS / cuadrilla / día</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>TOTAL OS PROCESADAS</div>
       <div class="kpi-val dk">${totalOS.toLocaleString()}</div>
-      <div class="kpi-sub">Órdenes de servicio semana</div></div>`;
+      <div class="kpi-sub">Órdenes de servicio</div></div>
+
+    <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>LLEGARON AL 100%+</div>
+      <div class="kpi-val gr">${con100}</div>
+      <div class="kpi-sub">${pct100}% de cuadrillas activas</div></div>`;
 
   // Distribución OS — horizontal bar chart (legible para todos los tipos)
   const tipoCount={};
@@ -1276,8 +1311,8 @@ function renderNacional(){
     const ctx=canvasFunnel.getContext('2d');ctx.clearRect(0,0,canvasFunnel.width,canvasFunnel.height);
   }
 
-  // Cobertura de Bono + Cuadrillas Activas — doble eje, últimas 10 semanas, respeta skill filter
-  let trendLabels=[], cobData=[], activasData=[];
+  // ── Tendencia 10 semanas: construir datos ──────────────────────────────────
+  let trendLabels=[], cobData=[], activasData=[], bonosData=[], osData=[], prodData=[];
   if(window._allRealData&&window._realWeeks&&window._realWeeks.length>=1){
     const last10=window._realWeeks.slice(-10);
     last10.forEach(wk=>{
@@ -1285,39 +1320,125 @@ function renderNacional(){
       const wkActivas=wkAll.filter(t=>t.nOrdenes>0).length;
       const wkConBono=wkAll.filter(t=>t.bonoFinal>0).length;
       const wkCob=wkActivas>0?(wkConBono/wkActivas*100):0;
+      const wkBonos=wkAll.reduce((s,t)=>s+t.bonoFinal,0);
+      const wkOS=wkAll.reduce((s,t)=>s+t.nOrdenes,0);
+      const wkProd=wkActivas>0?parseFloat((wkOS/wkActivas/6).toFixed(2)):0;
       trendLabels.push(formatWeekLabel(getMondayOfWeek(new Date(wk+'T12:00:00'))).split('–')[0].trim());
       cobData.push(parseFloat(wkCob.toFixed(1)));
       activasData.push(wkActivas);
+      bonosData.push(wkBonos);
+      osData.push(wkOS);
+      prodData.push(wkProd);
     });
   }else{
     trendLabels=['Semana actual'];
     cobData=[parseFloat(cobPct)];
     activasData=[activas];
+    bonosData=[totalBonos];
+    osData=[totalOS];
+    prodData=[parseFloat(prodProm)||0];
   }
+
+  // ── Chart 1: Bonos pagados (barras) + OS realizadas (línea) ───────────────
+  if(chartTrendVol)chartTrendVol.destroy();
+  chartTrendVol=new Chart(document.getElementById('chart-trend-vol'),{
+    type:'bar',
+    data:{labels:trendLabels,datasets:[
+      {type:'bar',label:'Bonos Pagados $',data:bonosData,backgroundColor:'rgba(232,84,32,.75)',borderRadius:4,borderSkipped:false,yAxisID:'y',order:2},
+      {type:'line',label:'Órdenes',data:osData,borderColor:'#2563EB',backgroundColor:'transparent',tension:.3,pointBackgroundColor:'#2563EB',pointRadius:4,pointHoverRadius:6,borderWidth:2,yAxisID:'y1',order:1}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+        label:c=>c.datasetIndex===0?`Bonos: ${f$(c.parsed.y)}`:`Órdenes: ${c.parsed.y.toLocaleString()}`
+      }}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
+        y:{position:'left',grid:{color:'#F3F4F6'},ticks:{callback:v=>fk(v),font:{size:10}},title:{display:true,text:'Bonos $',font:{size:9}}},
+        y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10}},title:{display:true,text:'Órdenes',font:{size:9}}}
+      }
+    }
+  });
+
+  // ── Chart 2: Cobertura % + Productividad + Cuadrillas ─────────────────────
   if(chartTrend)chartTrend.destroy();
   chartTrend=new Chart(document.getElementById('chart-trend'),{
     type:'line',
     data:{labels:trendLabels,datasets:[
       {label:'Cobertura %',data:cobData,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.07)',fill:true,tension:.3,pointBackgroundColor:'#E85420',pointRadius:4,pointHoverRadius:6,borderWidth:2.5,yAxisID:'y'},
-      {label:'Cuadrillas Activas',data:activasData,borderColor:'#2563EB',backgroundColor:'transparent',tension:.3,pointBackgroundColor:'#2563EB',pointRadius:4,pointHoverRadius:6,borderWidth:2,borderDash:[5,3],yAxisID:'y1'}
+      {label:'Productividad',data:prodData,borderColor:'#16A34A',backgroundColor:'transparent',tension:.3,pointBackgroundColor:'#16A34A',pointRadius:4,pointHoverRadius:6,borderWidth:2,yAxisID:'y2'},
+      {label:'Cuadrillas',data:activasData,borderColor:'#2563EB',backgroundColor:'transparent',tension:.3,pointBackgroundColor:'#2563EB',pointRadius:3,pointHoverRadius:5,borderWidth:1.5,borderDash:[5,3],yAxisID:'y1'}
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-        label:c=>c.datasetIndex===0?`Cobertura: ${c.parsed.y.toFixed(1)}%`:`Cuadrillas activas: ${c.parsed.y}`
+        label:c=>{
+          if(c.datasetIndex===0)return `Cobertura: ${c.parsed.y.toFixed(1)}%`;
+          if(c.datasetIndex===1)return `Productividad: ${c.parsed.y} OS/cuad/día`;
+          return `Cuadrillas activas: ${c.parsed.y}`;
+        }
       }}},
       scales:{
         x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
         y:{position:'left',grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:Math.min(110,Math.max(...cobData,10)+15),title:{display:true,text:'Cobertura %',font:{size:9}}},
-        y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10}},title:{display:true,text:'Cuadrillas',font:{size:9}}}
+        y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10}},title:{display:true,text:'Cuadrillas',font:{size:9}}},
+        y2:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>v.toFixed(1),font:{size:10}},display:false}
       }
     }
   });
   const lastCob=cobData[cobData.length-1]||0;
   const lastAct=activasData[activasData.length-1]||0;
+  const lastProd=prodData[prodData.length-1]||0;
   document.getElementById('stat-pair-trend').innerHTML=`
     <div class="stat-pair-item"><div class="stat-pair-label">Cobertura (últ. sem.)</div><div class="stat-pair-val" style="color:var(--or)">${lastCob.toFixed(1)}%</div></div>
-    <div class="stat-pair-item"><div class="stat-pair-label">Cuadrillas activas</div><div class="stat-pair-val" style="color:var(--blue)">${lastAct}</div></div>`;
+    <div class="stat-pair-item"><div class="stat-pair-label">Cuadrillas activas</div><div class="stat-pair-val" style="color:var(--blue)">${lastAct}</div></div>
+    <div class="stat-pair-item"><div class="stat-pair-label">Productividad</div><div class="stat-pair-val" style="color:var(--green)">${lastProd}</div></div>`;
+
+  // ── Análisis de Sensibilidad ───────────────────────────────────────────────
+  const tiers=[
+    {label:'100%+ — Bono Completo',pctMin:100,pctMax:Infinity,bg:'var(--green-l)',tc:'var(--green)'},
+    {label:'90–99% — Bono Medio',  pctMin:90, pctMax:100,     bg:'var(--yellow-l)',tc:'var(--yellow)'},
+    {label:'80–89% — Bono Base',   pctMin:80, pctMax:90,      bg:'var(--or-light)',tc:'var(--or)'},
+    {label:'Menos de 80% — Sin Bono',pctMin:0,pctMax:80,      bg:'#F3F4F6',tc:'var(--text3)'},
+  ];
+  const fdActivas=fd.filter(t=>t.nOrdenes>0);
+  const totalActivas=fdActivas.length||1;
+  let sensHtml=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#FAFAFA">
+      <th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Nivel</th>
+      <th style="padding:7px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Cuadrillas</th>
+      <th style="padding:7px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">% del total</th>
+      <th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Bono total</th>
+      <th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Promedio</th>
+    </tr></thead><tbody>`;
+  tiers.forEach(tier=>{
+    const grp=fdActivas.filter(t=>t.pct>=tier.pctMin&&t.pct<tier.pctMax);
+    const cnt=grp.length;
+    const pctOfTotal=(cnt/totalActivas*100).toFixed(1);
+    const monto=grp.reduce((s,t)=>s+t.bonoFinal,0);
+    const conB=grp.filter(t=>t.bonoFinal>0).length;
+    const prom=conB>0?Math.round(monto/conB):0;
+    sensHtml+=`<tr style="border-bottom:1px solid #F5F5F8">
+      <td style="padding:8px 10px"><span style="background:${tier.bg};color:${tier.tc};font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap">${tier.label}</span></td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700">${cnt}</td>
+      <td style="padding:8px 10px;text-align:center">
+        <div style="display:flex;align-items:center;gap:5px;justify-content:center">
+          <div style="width:40px;height:4px;background:#F0F0F5;border-radius:2px;overflow:hidden"><div style="width:${pctOfTotal}%;height:100%;background:${tier.tc};border-radius:2px"></div></div>
+          <span style="font-size:11px;font-weight:600;color:${tier.tc}">${pctOfTotal}%</span>
+        </div>
+      </td>
+      <td style="padding:8px 10px;text-align:right;font-weight:600">${monto>0?fk(monto):'—'}</td>
+      <td style="padding:8px 10px;text-align:right;color:var(--text2)">${prom>0?fk(prom):'—'}</td>
+    </tr>`;
+  });
+  sensHtml+=`<tr style="background:#FAFAFA;font-weight:700">
+    <td style="padding:8px 10px;font-size:12px">TOTAL ACTIVAS</td>
+    <td style="padding:8px 10px;text-align:center">${fdActivas.length}</td>
+    <td style="padding:8px 10px;text-align:center">100%</td>
+    <td style="padding:8px 10px;text-align:right;color:var(--or)">${fk(totalBonos)}</td>
+    <td style="padding:8px 10px;text-align:right;color:var(--text2)">${fdActivas.filter(t=>t.bonoFinal>0).length>0?fk(Math.round(totalBonos/fdActivas.filter(t=>t.bonoFinal>0).length)):'—'}</td>
+  </tr></tbody></table>`;
+  document.getElementById('sens-table-wrap').innerHTML=sensHtml;
 
 
   // Bono por distrito — solo datos reales, sin presupuesto inventado
@@ -1749,6 +1870,38 @@ function renderFicha(t){
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">BONO NETO FINAL</div>
       <div class="kpi-val or">${f$(t.bonoFinal)}</div>
       <div style="font-size:10px;color:var(--text3);margin-top:4px">${t.bonoBase>0?'Base: '+f$(t.bonoBase):'No alcanzó 80% de meta'}</div></div>`;
+
+  // Barra de progreso de estrellas
+  const spMax=Math.max(t.meta*1.25, t.estrellas*1.1, t.meta+10);
+  const spPct=v=>Math.min(v/spMax*100,100);
+  const sp80=spPct(t.meta*0.8), sp90=spPct(t.meta*0.9), sp100=spPct(t.meta), sp110=spPct(t.meta*1.1);
+  const spTec=spPct(t.estrellas);
+  const tierColor=t.pct>=100?'var(--green)':t.pct>=90?'var(--yellow)':t.pct>=80?'var(--or)':'var(--red)';
+  const tierLabel=t.pct>=110?'110%+ Extra':t.pct>=100?'100%+ Completo':t.pct>=90?'90–99% Medio':t.pct>=80?'80–89% Base':'Menos de 80%';
+  document.getElementById('star-progress-card').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div><div style="font-size:13px;font-weight:700">Progreso de Estrellas</div><div style="font-size:11px;color:var(--text3);margin-top:1px">Meta: ⭐ ${t.meta} · Logrado: ⭐ ${Math.round(t.estrellas)}</div></div>
+      <span style="background:${tierColor};color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px">${tierLabel}</span>
+    </div>
+    <div style="position:relative;height:36px;margin-bottom:22px">
+      <!-- zonas de color -->
+      <div style="position:absolute;inset:0;border-radius:6px;overflow:hidden;display:flex">
+        <div style="width:${sp80}%;background:#FEE2E2"></div>
+        <div style="width:${sp90-sp80}%;background:#FEF3C7"></div>
+        <div style="width:${sp100-sp90}%;background:#FED7AA"></div>
+        <div style="flex:1;background:#DCFCE7"></div>
+      </div>
+      <!-- marcadores de umbral -->
+      ${[{v:sp80,lbl:'80%',v2:t.meta*0.8},{v:sp90,lbl:'90%',v2:t.meta*0.9},{v:sp100,lbl:'100%',v2:t.meta},{v:sp110,lbl:'110%',v2:t.meta*1.1}].map(m=>`
+        <div style="position:absolute;left:${m.v}%;top:0;bottom:0;width:2px;background:rgba(0,0,0,.15)"></div>
+        <div style="position:absolute;left:${m.v}%;bottom:-18px;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--text3);white-space:nowrap">${m.lbl}<br><span style="font-weight:400">⭐${Math.round(m.v2)}</span></div>
+      `).join('')}
+      <!-- posición del técnico -->
+      <div style="position:absolute;left:${spTec}%;top:-4px;bottom:-4px;width:3px;background:${tierColor};border-radius:2px;box-shadow:0 0 0 2px white,0 0 0 3px ${tierColor}"></div>
+      <div style="position:absolute;left:${spTec}%;top:50%;transform:translate(-50%,-50%)">
+        <div style="background:${tierColor};color:white;font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;white-space:nowrap">⭐ ${Math.round(t.estrellas)}</div>
+      </div>
+    </div>`;
 
   // Histórico bonos — etiquetas reales de semanas
   const MNS3=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
