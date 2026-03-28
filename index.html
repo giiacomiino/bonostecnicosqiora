@@ -921,7 +921,7 @@ async function deleteAllSupabase(){
       return;
     }
 
-    const{error}=await _sb.from('orders').delete().gte('id',0);
+    const{error}=await _sb.from('orders').delete().not('id','is',null);
     if(error)throw error;
 
     // Verificar que realmente se borraron
@@ -952,7 +952,7 @@ async function uploadToSupabase(techMap,filename){
     // Borrar solo las semanas del nuevo Excel (conserva semanas anteriores)
     const weeksInFile=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))];
     if(weeksInFile.length){
-      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile);
+      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile).not('id','is',null);
       if(delErr)throw delErr;
     }
 
