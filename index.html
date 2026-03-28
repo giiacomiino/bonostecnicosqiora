@@ -893,6 +893,8 @@ function generateData(wk){
         distrito:dist, skill, meta, tipo, estrellas:est, pct, dias, inas,
         bonoBase:bb, bono110:b11, descuento:desc, bonoFinal:bf,
         historial:hist, asistencia:asist, ordersByDay,
+        nOrdenes:Object.values(ordersByDay).reduce((s,a)=>s+a.length,0),
+        semOrders:Object.values(ordersByDay).flat(),
         especialidad:ESPECIALIDADES[i%5], edad:r(22,48), exp:`${r(1,9)} años, ${r(0,11)} meses`,
       });
       tecIdx++;
@@ -910,6 +912,7 @@ function generateData(wk){
 // ═══════════════════════════════════════════
 const f$=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
 const fM=n=>'$'+(n/1000000).toFixed(1)+'M';
+const fk=n=>{if(n>=1000000)return '$'+(n/1000).toFixed(0)+'k';if(n>=1000)return '$'+(n/1000).toFixed(1)+'k';return '$'+Math.round(n);};
 const fp=n=>n.toFixed(1)+'%';
 const distShort=d=>d.replace('CTA-TPI-INT-','');
 function initials(n){const p=n.split(' ');return((p[0]||'')[0]+(p[1]||'')[0]).toUpperCase();}
@@ -963,86 +966,93 @@ function nav(id,el){
 // ═══════════════════════════════════════════
 function renderNacional(){
   const fd=getFiltered();
-  const total=fd.length||1;
-  const conBono=fd.filter(t=>t.bonoFinal>0).length;
+  const total=fd.length;
+  const activas=fd.filter(t=>t.nOrdenes>0).length;
   const totalBonos=fd.reduce((s,t)=>s+t.bonoFinal,0);
-  const cobertura=(fd.filter(t=>t.pct>=80).length/total*100).toFixed(1);
-  const estrellas=fd.reduce((s,t)=>s+t.estrellas,0);
-  const presupuesto=Math.round(totalBonos*1.08);
-  const desv=totalBonos-presupuesto;
+  const totalOS=fd.reduce((s,t)=>s+t.nOrdenes,0);
+  const avgPct=total>0?(fd.reduce((s,t)=>s+t.pct,0)/total).toFixed(1):0;
+  const prodProm=activas>0?(totalOS/activas).toFixed(1):'—';
+  const cobColor=parseFloat(avgPct)>=100?'gr':parseFloat(avgPct)>=80?'or':'rd';
 
   document.getElementById('kpi-nacional').innerHTML=`
-    <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>MONTO TOTAL PAGADO</div>
-      <div class="kpi-val dk">${fM(totalBonos)} <span style="font-size:13px;font-weight:500">MXN</span></div>
-      <div class="kpi-sub"><span class="kpi-up">↑ +12.5%</span></div></div>
-
-    <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>MONTO PROYECTADO SEM.</div>
-      <div class="kpi-val or">${fM(presupuesto)} <span style="font-size:13px;font-weight:500">MXN</span></div>
-      <div class="kpi-sub" style="color:var(--text3)">Cierre estimado sem. actual</div></div>
-
-    <div class="kpi-c green-top"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>COBERTURA PROM. NACIONAL</div>
-      <div class="kpi-val gr">${cobertura}%</div>
-      <div><span class="status-tag st-green">META ALCANZADA</span></div></div>
+    <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)"><svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>MONTO TOTAL BONOS</div>
+      <div class="kpi-val or">${fk(totalBonos)}</div>
+      <div class="kpi-sub" style="color:var(--text3)">${total} técnicos · semana actual</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>CUADRILLAS ACTIVAS</div>
-      <div class="kpi-val dk">${total.toLocaleString()}</div>
-      <div class="kpi-sub">Promedio móvil semanal</div></div>
+      <div class="kpi-val dk">${activas.toLocaleString()}</div>
+      <div class="kpi-sub">Con al menos 1 OS en la semana</div></div>
 
-    <div class="kpi-c red-top"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>DESVIACIÓN PRESUPUESTAL</div>
-      <div class="kpi-val rd">${fM(desv)}</div>
-      <div class="kpi-sub"><span class="kpi-dn">Alerta en ${r(3,6)} distritos</span></div></div>`;
+    <div class="kpi-c green-top"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>COBERTURA NACIONAL</div>
+      <div class="kpi-val ${cobColor}">${avgPct}%</div>
+      <div><span class="status-tag ${parseFloat(avgPct)>=100?'st-green':parseFloat(avgPct)>=80?'st-orange':'st-red'}">${parseFloat(avgPct)>=100?'Meta alcanzada':parseFloat(avgPct)>=80?'En rango':'Bajo objetivo'}</span></div></div>
 
-  // Funnel OS
-  const osTypes=[{label:'Instalaciones',pct:45,w:'90%'},
-    {label:'Mantenimiento',pct:30,w:'72%'},{label:'Soporte / Reparaciones',pct:15,w:'50%'},{label:'Otros',pct:10,w:'34%'}];
-  document.getElementById('funnel-os').innerHTML=osTypes.map((o,i)=>
-    `<div class="funnel-bar-wrap">
-      <div class="funnel-bar" style="width:${o.w};background:${OR_SHADES[i]}">${o.label} (${o.pct}%)</div>
-    </div>`
-  ).join('');
+    <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>PRODUCTIVIDAD PROM.</div>
+      <div class="kpi-val dk">${prodProm}</div>
+      <div class="kpi-sub">OS por cuadrilla activa</div></div>
 
-  // Trend chart
-  const weeks=['S15','S16','S17','S18','S19','S20','S21','S22','S23','S24'];
-  const trendData=[78,74,81,80,84,87,85,89,92,parseFloat(cobertura)];
+    <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>TOTAL OS PROCESADAS</div>
+      <div class="kpi-val dk">${totalOS.toLocaleString()}</div>
+      <div class="kpi-sub">Órdenes de servicio semana</div></div>`;
+
+  // Funnel OS — desglose real por tipo de servicio
+  const tipoCount={};
+  fd.forEach(t=>(t.semOrders||[]).forEach(o=>{tipoCount[o.tipo]=(tipoCount[o.tipo]||0)+1;}));
+  const sortedTipos=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxTipo=sortedTipos[0]?sortedTipos[0][1]:1;
+  document.getElementById('funnel-os').innerHTML=sortedTipos.length?sortedTipos.map(([tipo,cnt],i)=>{
+    const w=Math.round(cnt/maxTipo*100);
+    const pct=totalOS>0?(cnt/totalOS*100).toFixed(1):0;
+    return `<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(w,18)}%;background:${OR_SHADES[i]}">${tipo} (${pct}%)</div></div>`;
+  }).join(''):'<div style="color:var(--text3);font-size:12px;padding:16px 0">Sin datos — carga un archivo Excel</div>';
+
+  // Tendencia semanal — usa datos reales si hay múltiples semanas
+  let trendLabels=[], trendData=[];
+  if(window._allRealData&&window._realWeeks&&window._realWeeks.length>1){
+    window._realWeeks.forEach(wk=>{
+      const wkData=window._allRealData.filter(t=>t.semana===wk);
+      const wkPct=wkData.length>0?(wkData.reduce((s,t)=>s+t.pct,0)/wkData.length):0;
+      trendLabels.push(formatWeekLabel(getMondayOfWeek(new Date(wk+'T12:00:00'))).split('–')[0].trim());
+      trendData.push(parseFloat(wkPct.toFixed(1)));
+    });
+  }else{
+    trendLabels=[total>0?'Semana actual':'Sin datos'];
+    trendData=[parseFloat(avgPct)];
+  }
+  const trendMin=Math.max(0,Math.min(...trendData)-10);
   if(chartTrend)chartTrend.destroy();
   chartTrend=new Chart(document.getElementById('chart-trend'),{
     type:'line',
-    data:{labels:weeks,datasets:[{data:trendData,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.4,pointBackgroundColor:'#E85420',pointRadius:4,pointHoverRadius:6,borderWidth:2.5}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(1)+'%'}}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:60,max:100}}}
+    data:{labels:trendLabels,datasets:[{data:trendData,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.3,pointBackgroundColor:'#E85420',pointRadius:5,pointHoverRadius:7,borderWidth:2.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(1)+'%'}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
+        y:{grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:trendMin,max:Math.min(130,Math.max(...trendData)+10)}}}
   });
-  const mx=Math.max(...trendData);
-  const trend=trendData[9]-trendData[0];
+  const trendMax=Math.max(...trendData);
+  const trendDelta=trendData.length>1?(trendData[trendData.length-1]-trendData[0]).toFixed(1):null;
   document.getElementById('stat-pair-trend').innerHTML=`
-    <div class="stat-pair-item"><div class="stat-pair-label">Máximo Histórico</div><div class="stat-pair-val" style="color:var(--or)">${mx.toFixed(1)}%</div></div>
-    <div class="stat-pair-item"><div class="stat-pair-label">Tendencia</div><div class="stat-pair-val" style="color:var(--green)">↑ +${trend.toFixed(1)} pts</div></div>`;
+    <div class="stat-pair-item"><div class="stat-pair-label">Máximo semana</div><div class="stat-pair-val" style="color:var(--or)">${trendMax.toFixed(1)}%</div></div>
+    ${trendDelta!==null?`<div class="stat-pair-item"><div class="stat-pair-label">Variación</div><div class="stat-pair-val" style="color:${parseFloat(trendDelta)>=0?'var(--green)':'var(--red)'}">${parseFloat(trendDelta)>=0?'↑ +':'↓ '}${trendDelta} pts</div></div>`:''}`;
 
-  // Bono vs Presupuesto — grouped bar chart clickeable por distrito
+  // Bono por distrito — solo datos reales, sin presupuesto inventado
   const distBonos={};
   fd.forEach(t=>{distBonos[t.distrito]=(distBonos[t.distrito]||0)+t.bonoFinal;});
   const sortedDB=Object.entries(distBonos).sort((a,b)=>b[1]-a[1]);
   const dbLabels=sortedDB.map(([d])=>distShort(d));
   const dbPagado=sortedDB.map(([,v])=>v);
-  // Presupuesto: fijo por semana para que sea consistente (seed basado en nombre distrito)
-  const dbPres=sortedDB.map(([d,v])=>{
-    const seed=d.split('').reduce((a,c)=>a+c.charCodeAt(0),0)%20-10;
-    return Math.round(v*(1+seed/100));
-  });
-  const dbColors=sortedDB.map(([,pago],i)=>dbPago=>dbPres[i]?'#E85420':'#C62828');
 
   if(window._chartBonoDist)window._chartBonoDist.destroy();
   window._chartBonoDist=new Chart(document.getElementById('chart-bono-dist'),{
     type:'bar',
     data:{labels:dbLabels,datasets:[
-      {label:'Presupuesto',data:dbPres,backgroundColor:'rgba(200,200,208,.8)',borderRadius:4,borderSkipped:false,borderWidth:0},
-      {label:'Pagado',data:dbPagado,backgroundColor:sortedDB.map(([,v],i)=>dbPagado[i]>=dbPres[i]?'#E85420':'#DC2626'),borderRadius:4,borderSkipped:false,borderWidth:0},
+      {label:'Bono Total',data:dbPagado,backgroundColor:'#E85420',borderRadius:4,borderSkipped:false,borderWidth:0},
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,
       onClick:(evt,elements)=>{
         if(!elements.length)return;
-        const idx=elements[0].index;
-        const dist=sortedDB[idx][0];
+        const dist=sortedDB[elements[0].index][0];
         document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
         document.querySelectorAll('.nav-i').forEach(n=>n.classList.remove('active'));
         document.getElementById('view-distritos').classList.add('active');
@@ -1052,20 +1062,12 @@ function renderNacional(){
         openDist(dist);
       },
       plugins:{
-        legend:{display:true,position:'top',labels:{font:{size:11},boxWidth:10,boxHeight:10}},
-        tooltip:{callbacks:{
-          label:c=>c.dataset.label+': '+f$(c.parsed.y),
-          afterBody:items=>{
-            const i=items[0].dataIndex;
-            const diff=((dbPagado[i]-dbPres[i])/dbPres[i]*100).toFixed(1);
-            const sign=parseFloat(diff)>=0?'+':'';
-            return [`Variación: ${sign}${diff}%`,`→ Clic para ver detalle del distrito`];
-          }
-        }}
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>f$(c.parsed.y),afterBody:()=>['→ Clic para ver detalle']}}
       },
       scales:{
         x:{ticks:{font:{size:9},maxRotation:40},grid:{display:false}},
-        y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}},
+        y:{ticks:{callback:v=>fk(v),font:{size:10}},grid:{color:'#F3F4F6'}},
       }
     }
   });
@@ -1120,104 +1122,102 @@ function openDist(d){
 }
 
 function renderDistDetail(d){
-  const info=METAS[d];
+  const info=METAS[d]||{t:'B'};
   const tecs=getFiltered().filter(t=>t.distrito===d);
+  const total=tecs.length;
+  const activas=tecs.filter(t=>t.nOrdenes>0).length;
   const totalB=tecs.reduce((s,t)=>s+t.bonoFinal,0);
-  const avgPct=(tecs.reduce((s,t)=>s+t.pct,0)/tecs.length).toFixed(1);
-  const avgProd=(tecs.reduce((s,t)=>s+t.estrellas,0)/tecs.length/6).toFixed(1);
-  const presEst=Math.round(totalB*1.06);
+  const totalOS=tecs.reduce((s,t)=>s+t.nOrdenes,0);
+  const avgPct=total>0?(tecs.reduce((s,t)=>s+t.pct,0)/total).toFixed(1):'0';
+  const prodProm=activas>0?(totalOS/activas).toFixed(1):'—';
 
   document.getElementById('dp-dname').textContent=distShort(d);
-  document.getElementById('dp-did').textContent='ID: DSP-'+Math.abs(d.hashCode?d.hashCode():d.length*7+42).toString().slice(0,3).padStart(3,'0');
+  document.getElementById('dp-did').textContent='Tipo '+info.t;
   document.getElementById('rdot-a').className='rdot'+(info.t==='A'?' on':'');
   document.getElementById('rdot-b').className='rdot'+(info.t==='B'?' on':'');
 
   const lmColor=parseFloat(avgPct)>=100?'gr':parseFloat(avgPct)>=80?'or':'rd';
   const lmStatus=parseFloat(avgPct)>=100?'st-green':parseFloat(avgPct)>=90?'st-orange':'st-yellow';
-  const lmMsg=parseFloat(avgPct)>=100?'Meta alcanzada':parseFloat(avgPct)>=90?'En rango de atención':'Bajo el objetivo';
+  const lmMsg=parseFloat(avgPct)>=100?'Meta alcanzada':parseFloat(avgPct)>=90?'En rango':'Bajo el objetivo';
 
   document.getElementById('kpi-dist').innerHTML=`
     <div class="kpi-c"><div class="kpi-label">LOGRO META DISTRITAL</div>
       <div class="kpi-val ${lmColor}">${avgPct}%</div>
       <span class="status-tag ${lmStatus}">${lmMsg}</span></div>
-    <div class="kpi-c"><div class="kpi-label">ALCANCE VENTAS</div>
-      <div class="kpi-val or">${(parseFloat(avgPct)*0.82).toFixed(1)}%</div>
-      <span class="status-tag st-red">Bajo el objetivo</span></div>
-    <div class="kpi-c green-top"><div class="kpi-label">CUMPLIMIENTO PROD.</div>
-      <div class="kpi-val gr">${(parseFloat(avgPct)*1.05).toFixed(1)}%</div>
-      <span class="status-tag st-green">Excediendo meta</span></div>
-    <div class="kpi-c"><div class="kpi-label">MONTO ESTIMADO SEM.</div>
-      <div class="kpi-val dk">${f$(presEst)}</div>
-      <div class="kpi-sub">Proyección al cierre</div></div>
+    <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">MONTO BONOS DISTRITO</div>
+      <div class="kpi-val or">${fk(totalB)}</div>
+      <div class="kpi-sub">${total} técnicos</div></div>
+    <div class="kpi-c green-top"><div class="kpi-label">CUADRILLAS ACTIVAS</div>
+      <div class="kpi-val gr">${activas}</div>
+      <div class="kpi-sub">Con ≥1 OS en la semana</div></div>
     <div class="kpi-c"><div class="kpi-label">PRODUCTIVIDAD MEDIA</div>
-      <div class="kpi-val dk">${avgProd}</div>
-      <div class="kpi-sub">v/día por cuadrilla</div></div>`;
+      <div class="kpi-val dk">${prodProm}</div>
+      <div class="kpi-sub">OS por cuadrilla activa</div></div>
+    <div class="kpi-c"><div class="kpi-label">TOTAL OS</div>
+      <div class="kpi-val dk">${totalOS.toLocaleString()}</div>
+      <div class="kpi-sub">Órdenes procesadas semana</div></div>`;
 
-  // Cascade chart (waterfall penalizaciones)
+  // Cascade real: Bono Base → +110% → −Descuento → Neto
   const baseB=tecs.reduce((s,t)=>s+t.bonoBase,0);
-  const sem1desc=Math.round(baseB*0.12);
-  const sem2desc=Math.round(baseB*0.08);
-  const sem3desc=Math.round(baseB*0.10);
-  const neto=baseB-sem1desc-sem2desc-sem3desc+tecs.reduce((s,t)=>s+t.bono110,0);
-
+  const extra110=tecs.reduce((s,t)=>s+t.bono110,0);
+  const descTotal=tecs.reduce((s,t)=>s+t.descuento,0);
+  const netoFinal=tecs.reduce((s,t)=>s+t.bonoFinal,0);
   if(chartCascade)chartCascade.destroy();
   chartCascade=new Chart(document.getElementById('chart-cascade'),{
     type:'bar',
     data:{
-      labels:['Inicial','Sem 1','Sem 2','Sem 3','Actual'],
-      datasets:[
-        {label:'Base',data:[baseB,null,null,null,null],backgroundColor:'#C8D0E0',borderRadius:4,borderSkipped:false},
-        {label:'Descuento',data:[null,sem1desc,sem2desc,sem3desc,null],backgroundColor:'#FCA5A5',borderRadius:4,borderSkipped:false},
-        {label:'Neto',data:[null,null,null,null,neto],backgroundColor:'#E85420',borderRadius:4,borderSkipped:false},
-      ]
+      labels:['Bono Base',extra110>0?'+ Extra 110%':null,'− Descuentos','Neto Final'].filter(Boolean),
+      datasets:[{
+        data:[baseB,extra110>0?extra110:null,descTotal>0?-descTotal:null,netoFinal].filter(v=>v!==null),
+        backgroundColor:[baseB>0?'#C8D0E0':'#eee',extra110>0?'#16A34A':null,descTotal>0?'#FCA5A5':null,'#E85420'].filter(v=>v!==null),
+        borderRadius:4,borderSkipped:false
+      }]
     },
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(c.parsed.y)}}},
-      scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}}}}
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(Math.abs(c.parsed.y))}}},
+      scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>fk(Math.abs(v)),font:{size:10}},grid:{color:'#F3F4F6'}}}}
   });
 
-  // Top coordinadores
+  // Top coordinadores del distrito
   const distCoords=coordData.filter(c=>c.distrito===d).sort((a,b)=>b.ordenesSem-a.ordenesSem).slice(0,7);
-  document.getElementById('tbody-coords').innerHTML=distCoords.map((c,i)=>`
+  document.getElementById('tbody-coords').innerHTML=distCoords.length?distCoords.map((c,i)=>`
     <tr onclick="openCoord('${c.id}')">
       <td><span class="rk ${i===0?'rk1':i===1?'rk2':i===2?'rk3':''}">${i+1}</span></td>
       <td style="font-weight:500">${c.nombre}</td>
       <td>${c.ordenesSem}</td>
       <td style="font-weight:700;color:var(--or)">${c.prodProm}</td>
-    </tr>`).join('');
+    </tr>`):'<tr><td colspan="4" style="color:var(--text3);text-align:center;padding:12px">Sin coordinadores registrados</td></tr>';
+  distCoords.forEach(r=>r.innerHTML='');
 
-  // OS donut
-  const osData=[
-    {label:'Instalaciones',pct:60,color:'#E85420'},
-    {label:'Mantenimiento',pct:25,color:'#F0703A'},
-    {label:'Reparaciones',pct:15,color:'#FBBFA7'},
-  ];
-  const totalOS=tecs.reduce((s,t)=>s+t.dias,0)*r(4,8);
+  // OS donut — desglose real por tipo de servicio del distrito
+  const tipoCount={};
+  tecs.forEach(t=>(t.semOrders||[]).forEach(o=>{tipoCount[o.tipo]=(tipoCount[o.tipo]||0)+1;}));
+  const tipoEntries=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const donutColors=['#E85420','#F0703A','#F89060','#FBBFA7'];
+  const totalOSFull=tipoEntries.reduce((s,[,n])=>s+n,0)||1;
   document.getElementById('os-total-num').textContent=totalOS.toLocaleString();
-
   if(chartOsDist)chartOsDist.destroy();
-  const ctx=document.getElementById('chart-os-dist');
-  chartOsDist=new Chart(ctx,{
-    type:'doughnut',
-    data:{labels:osData.map(o=>o.label),datasets:[{data:osData.map(o=>o.pct),backgroundColor:osData.map(o=>o.color),borderWidth:2,borderColor:'white'}]},
-    options:{responsive:true,maintainAspectRatio:true,cutout:'65%',plugins:{legend:{display:false}}}
-  });
-
-  document.getElementById('os-legend').innerHTML=osData.map(o=>{
-    const count=Math.round(totalOS*o.pct/100);
-    return `<div class="os-leg-i">
-      <div class="os-leg-hdr">
-        <span class="os-leg-name"><span class="os-dot" style="background:${o.color}"></span>${o.label}</span>
-        <span class="os-count">${o.pct}% (${count.toLocaleString()})</span>
-      </div>
-      <div class="pb"><div class="pf" style="width:${o.pct}%;background:${o.color}"></div></div>
-    </div>`;
-  }).join('');
+  if(tipoEntries.length){
+    chartOsDist=new Chart(document.getElementById('chart-os-dist'),{
+      type:'doughnut',
+      data:{labels:tipoEntries.map(([t])=>t),datasets:[{data:tipoEntries.map(([,n])=>n),backgroundColor:donutColors,borderWidth:2,borderColor:'white'}]},
+      options:{responsive:true,maintainAspectRatio:true,cutout:'65%',plugins:{legend:{display:false}}}
+    });
+    document.getElementById('os-legend').innerHTML=tipoEntries.map(([tipo,cnt],i)=>
+      `<div class="os-leg-i"><div class="os-leg-hdr">
+        <span class="os-leg-name"><span class="os-dot" style="background:${donutColors[i]}"></span>${tipo}</span>
+        <span class="os-count">${(cnt/totalOSFull*100).toFixed(1)}% (${cnt.toLocaleString()})</span>
+      </div><div class="pb"><div class="pf" style="width:${(cnt/totalOSFull*100).toFixed(0)}%;background:${donutColors[i]}"></div></div></div>`
+    ).join('');
+  }else{
+    document.getElementById('os-legend').innerHTML='<div style="color:var(--text3);font-size:12px">Sin datos de OS</div>';
+  }
 
   const pctF=parseFloat(avgPct);
   document.getElementById('alert-text').textContent=
-    pctF>=100?`${distShort(d)} ha superado su meta semanal con ${avgPct}%. ¡Equipo de alto rendimiento!`
-    :pctF>=80?`${distShort(d)} se encuentra al ${avgPct}% de su meta semanal. Se recomienda reforzar el cierre de la semana.`
-    :`${distShort(d)} está ${(100-pctF).toFixed(1)}% por debajo de la meta. Requiere atención inmediata.`;
+    pctF>=100?`${distShort(d)} ha superado su meta semanal con ${avgPct}%.`
+    :pctF>=80?`${distShort(d)} se encuentra al ${avgPct}% de su meta semanal.`
+    :`${distShort(d)} está ${(100-pctF).toFixed(1)}% por debajo de la meta.`;
 }
 
 // ═══════════════════════════════════════════
@@ -1276,63 +1276,67 @@ function openCoord(cid){
 
 function renderCoordDetail(coord){
   document.getElementById('coord-detail-name').textContent=coord.nombre;
-  document.getElementById('coord-detail-sub').textContent=`Coordinador Operativo · ${distShort(coord.distrito)} · Semana 3`;
+  document.getElementById('coord-detail-sub').textContent=`Coordinador Operativo · ${distShort(coord.distrito)}`;
 
   const tecs=getFiltered().filter(t=>coord.tecnicosIds.includes(t.id));
+  const total=tecs.length;
+  const activas=tecs.filter(t=>t.nOrdenes>0).length;
+  const totalOS=tecs.reduce((s,t)=>s+t.nOrdenes,0);
+  const prodProm=activas>0?(totalOS/activas).toFixed(1):'—';
   const alcanceMeta=coord.alcanceMeta;
-  const asistPct=r(88,99);
-  const prodAlcance=r(65,95);
   const tendBono=tecs.reduce((s,t)=>s+t.bonoFinal,0);
+  // Asistencia real: promedio de días trabajados / 6 días laborales
+  const asistPct=total>0?Math.round(tecs.reduce((s,t)=>s+(t.dias/6*100),0)/total):0;
 
   const mc=alcanceMeta>=100?'gr':alcanceMeta>=80?'or':'rd';
-  const ms=alcanceMeta>=100?'st-green Meta Superada':alcanceMeta>=90?'st-orange En rango':'st-red Bajo objetivo';
+  const ms=alcanceMeta>=100?'st-green':alcanceMeta>=90?'st-orange':'st-red';
+  const msLabel=alcanceMeta>=100?'Meta Superada':alcanceMeta>=90?'En rango':'Bajo objetivo';
 
   document.getElementById('kpi-coord').innerHTML=`
     <div class="kpi-c green-top"><div class="kpi-label">ALCANCE DE META BONO</div>
       <div class="kpi-val ${mc}">${alcanceMeta.toFixed(1)}%</div>
-      <span class="status-tag ${ms.split(' ')[0]}">${ms.split(' ').slice(1).join(' ')}</span></div>
-    <div class="kpi-c"><div class="kpi-label">ASISTENCIA VS META</div>
-      <div class="kpi-val dk">${asistPct}% <span style="font-size:13px;font-weight:400;color:var(--text3)">/ 98%</span></div>
-      <span class="status-tag st-yellow">⚠ ${r(1,3)} Inasistencias</span></div>
-    <div class="kpi-c"><div class="kpi-label">ALCANCE DE PRODUCTIVIDAD</div>
-      <div class="kpi-val ${prodAlcance>=80?'or':'rd'}">${prodAlcance}%</div>
-      <span class="status-tag ${prodAlcance>=80?'st-orange':'st-red'}">${prodAlcance>=80?'Alcanzado':'Por debajo del 80%'}</span></div>
-    <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">TENDENCIA SEMANAL BONO</div>
-      <div class="kpi-val or">${f$(tendBono)}</div>
-      <div class="kpi-sub">Proyección a fin de semana</div></div>`;
+      <span class="status-tag ${ms}">${msLabel}</span></div>
+    <div class="kpi-c"><div class="kpi-label">ASISTENCIA EQUIPO</div>
+      <div class="kpi-val dk">${asistPct}%</div>
+      <span class="status-tag ${asistPct>=80?'st-green':'st-yellow'}">${asistPct>=80?'Regular':'Baja asistencia'}</span></div>
+    <div class="kpi-c"><div class="kpi-label">PRODUCTIVIDAD PROM.</div>
+      <div class="kpi-val or">${prodProm}</div>
+      <div class="kpi-sub">OS / cuadrilla activa</div></div>
+    <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">TOTAL BONOS EQUIPO</div>
+      <div class="kpi-val or">${fk(tendBono)}</div>
+      <div class="kpi-sub">${total} técnicos en equipo</div></div>`;
 
-  // Pyramid funnel
-  const volTotal=coord.ordenesSem;
-  document.getElementById('coord-vol-total').textContent=`VOLUMEN: ${volTotal.toLocaleString()}`;
-  const pyramid=[
-    {label:`Instalaciones`,count:Math.round(volTotal*.52),pct:100},
-    {label:'Mantenimiento',count:Math.round(volTotal*.33),pct:83},
-    {label:'Soporte Técnico',count:Math.round(volTotal*.12),pct:24},
-    {label:'Retiros/Cambios',count:Math.round(volTotal*.03),pct:6},
-  ];
-  document.getElementById('coord-pyramid').innerHTML=pyramid.map((p,i)=>{
-    const wPct=40+p.pct*0.6;
+  // Pirámide — OS reales por tipo de servicio del coordinador
+  const tipoCount={};
+  tecs.forEach(t=>(t.semOrders||[]).forEach(o=>{tipoCount[o.tipo]=(tipoCount[o.tipo]||0)+1;}));
+  const sortedTipos=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  document.getElementById('coord-vol-total').textContent=`TOTAL OS: ${totalOS.toLocaleString()}`;
+  const maxTipo=sortedTipos[0]?sortedTipos[0][1]:1;
+  document.getElementById('coord-pyramid').innerHTML=sortedTipos.length?sortedTipos.map(([ tipo,cnt],i)=>{
+    const wPct=40+Math.round(cnt/maxTipo*60);
     return `<div class="py-level" style="justify-content:center">
       <div class="py-bar" style="width:${wPct}%;background:${OR_SHADES[i]};justify-content:space-between">
-        <span>${p.label} (${p.count.toLocaleString()})</span>
-        <span style="font-size:10px;opacity:.8">${p.pct}%</span>
-      </div>
-    </div>`;
-  }).join('');
+        <span>${tipo} (${cnt.toLocaleString()})</span>
+        <span style="font-size:10px;opacity:.8">${(cnt/totalOS*100).toFixed(0)}%</span>
+      </div></div>`;
+  }).join(''):'<div style="color:var(--text3);font-size:12px;padding:16px">Sin datos de OS</div>';
 
-  // Metas progress
-  const metas=[
-    {label:'Meta de Instalaciones Semanal',pct:r(95,118),color:'var(--green)'},
-    {label:'Meta de Reparaciones (SLA)',pct:r(75,98),color:'var(--yellow)'},
-    {label:'Asistencia Promedio Equipo',pct:asistPct,color:asistPct>=80?'var(--green)':'var(--red)'},
-  ];
-  document.getElementById('coord-metas').innerHTML=metas.map(m=>{
-    const c=m.pct>=100?'var(--green)':m.pct>=80?'var(--yellow)':'var(--red)';
-    return `<div class="meta-item">
-      <div class="meta-hdr"><span class="meta-name">${m.label}</span><span class="meta-pct" style="color:${c}">${m.pct}%</span></div>
-      <div class="pb-lg"><div class="pf" style="width:${Math.min(m.pct,100)}%;background:${c}"></div></div>
+  // Metas reales: alcance prom del equipo
+  const conBono=tecs.filter(t=>t.bonoFinal>0).length;
+  const pctCobBono=total>0?(conBono/total*100).toFixed(1):0;
+  document.getElementById('coord-metas').innerHTML=`
+    <div class="meta-item">
+      <div class="meta-hdr"><span class="meta-name">Cobertura de meta bono (≥80%)</span><span class="meta-pct" style="color:${parseFloat(pctCobBono)>=80?'var(--green)':'var(--red)'}">${pctCobBono}%</span></div>
+      <div class="pb-lg"><div class="pf" style="width:${Math.min(parseFloat(pctCobBono),100)}%;background:${parseFloat(pctCobBono)>=80?'var(--green)':'var(--red)'}"></div></div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-hdr"><span class="meta-name">Asistencia promedio equipo</span><span class="meta-pct" style="color:${asistPct>=80?'var(--green)':'var(--yellow)'}">${asistPct}%</span></div>
+      <div class="pb-lg"><div class="pf" style="width:${Math.min(asistPct,100)}%;background:${asistPct>=80?'var(--green)':'var(--yellow)'}"></div></div>
+    </div>
+    <div class="meta-item">
+      <div class="meta-hdr"><span class="meta-name">Técnicos con bono completo (100%+)</span><span class="meta-pct" style="color:var(--or)">${tecs.filter(t=>t.pct>=100).length} / ${total}</span></div>
+      <div class="pb-lg"><div class="pf" style="width:${total>0?Math.round(tecs.filter(t=>t.pct>=100).length/total*100):0}%;background:var(--or)"></div></div>
     </div>`;
-  }).join('');
 
   // Ranking table
   document.getElementById('tbody-coord-tecs').innerHTML=tecs.sort((a,b)=>b.pct-a.pct).map((t,i)=>{
@@ -1345,13 +1349,13 @@ function renderCoordDetail(coord){
         <div style="width:32px;height:32px;border-radius:50%;background:${avatarGradient(t.nombre)};display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:700;flex-shrink:0">${initials(t.nombre)}</div>
         <div><div style="font-weight:600">${t.nombre}</div><div style="font-size:11px;color:var(--text3)">ID: ${t.id}</div></div>
       </div></td>
-      <td>${miniBar(effPct,effColor)}</td>
+      <td>${miniBar(Math.round(effPct),effColor)}</td>
       <td>${pctBadge(t.pct)}</td>
       <td>${f$(t.bonoBase)}</td>
       <td style="font-weight:700;color:${effColor}">${f$(t.bonoFinal)}</td>
       <td><span class="${trendCls}">${trend}</span></td>
     </tr>`;
-  }).join('');
+  }).join('')||'<tr><td colspan="6" style="color:var(--text3);text-align:center">Sin técnicos</td></tr>';
 }
 
 // ═══════════════════════════════════════════
@@ -1925,6 +1929,8 @@ function rebuildFromRawOrders(){
         bonoBase:bb,bono110:b11,descuento:desc,bonoFinal:bf,
         historial:histAll.slice(),asistencia:asist,
         ordersByDay:ordersByDayFull,
+        nOrdenes:g.ordenes.length,
+        semOrders:g.ordenes,
         especialidad:'FIBRA ÓPTICA',edad:30,exp:'—',
         semana:wk,
       });
