@@ -912,15 +912,34 @@ async function deleteAllSupabase(){
   if(!confirm('¿Seguro que quieres borrar TODOS los datos de Supabase? Esta acción no se puede deshacer.'))return;
   setSbStatus('Borrando…',null);
   try{
+    // Contar antes de borrar
+    const{count:antes,error:cErr}=await _sb.from('orders').select('*',{count:'exact',head:true});
+    if(cErr)throw cErr;
+
+    if(antes===0){
+      setSbStatus('Ya no hay datos en Supabase',true);
+      return;
+    }
+
     const{error}=await _sb.from('orders').delete().gte('id',0);
     if(error)throw error;
+
+    // Verificar que realmente se borraron
+    const{count:despues,error:cErr2}=await _sb.from('orders').select('*',{count:'exact',head:true});
+    if(cErr2)throw cErr2;
+    if(despues>0){
+      setSbStatus(`Error: quedan ${despues} filas. Falta política DELETE en Supabase — corre: create policy "anon delete" on orders for delete using (true);`,false);
+      return;
+    }
+
     // Limpiar estado local
     window._techMap=null; window._realWeeks=null; window._allRealData=null;
     allData=[]; coordData=[];
-    document.getElementById('source-label').textContent='Sin datos';
-    document.getElementById('week-sel').innerHTML='';
+    const sl=document.getElementById('source-label');
+    sl.textContent='Sin datos'; sl.style.color='var(--text3)';
+    document.getElementById('week-sel').innerHTML='<option value="">Sin semanas</option>';
     document.getElementById('month-sel').innerHTML='';
-    setSbStatus('✓ Datos eliminados',true);
+    setSbStatus(`✓ ${antes.toLocaleString()} registros eliminados`,true);
     renderAll();
   }catch(err){
     setSbStatus('Error: '+err.message,false);
