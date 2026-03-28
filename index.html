@@ -311,6 +311,10 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       <svg width="13" height="13" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       Cargar desde Supabase
     </button>
+    <button onclick="deleteAllSupabase()" style="width:100%;background:white;color:var(--red);border:1.5px solid #FECACA;border-radius:8px;padding:7px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:6px">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      Borrar todos los datos
+    </button>
     <div id="sb-status" style="font-size:10px;color:var(--text3);text-align:center;min-height:14px;line-height:1.4">Listo</div>
   </div>
 
@@ -890,6 +894,25 @@ async function loadFromSupabase(){
   }catch(err){
     setSbStatus('Error: '+err.message,false);
     console.error('Supabase load error:',err);
+  }
+}
+
+async function deleteAllSupabase(){
+  if(!confirm('¿Seguro que quieres borrar TODOS los datos de Supabase? Esta acción no se puede deshacer.'))return;
+  setSbStatus('Borrando…',null);
+  try{
+    const{error}=await _sb.from('orders').delete().gte('id',0);
+    if(error)throw error;
+    // Limpiar estado local
+    window._techMap=null; window._realWeeks=null; window._allRealData=null;
+    allData=[]; coordData=[];
+    document.getElementById('source-label').textContent='Sin datos';
+    document.getElementById('week-sel').innerHTML='';
+    document.getElementById('month-sel').innerHTML='';
+    setSbStatus('✓ Datos eliminados',true);
+    renderAll();
+  }catch(err){
+    setSbStatus('Error: '+err.message,false);
   }
 }
 
