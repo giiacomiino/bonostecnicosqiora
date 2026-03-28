@@ -1155,10 +1155,8 @@ const METAS={
   'CTA-TPI-INT-COL COLIMA':         {t:'B',N:90,Mo:70,H:90,E:90,Mu:90},
 };
 const BONOS={A:{'80':500,'90':900,'100':2500},B:{'80':450,'90':800,'100':1800}};
-// 7 distritos con esquema de penalización por inasistencias (fuente: Bono tecnico DQ16:DU34)
+// 7 distritos con esquema de penalización por inasistencias
 const DESC_D=new Set(['CTA-TPI-INT-IRA IRAPUATO','CTA-TPI-INT-LON LEON','CTA-TPI-INT-GBA GDL BARRANCA','CTA-TPI-INT-GES GDL ESTADIO','CTA-TPI-INT-GLM GDL LOPEZ MATEOS','CTA-TPI-INT-GPR GDL PRIMAVERA','CTA-TPI-INT-VRZ VERACRUZ']);
-// Base fija de bono de asistencia: $400/semana. Tasas: 1 inasistencia=50%, 2+=100%
-const DESCUENTO_BASE=400;
 const SERVICIOS=[['Instalación',6],['Soporte',3],['Mantenimiento Mayor',4],['Mantenimiento',3],['Addons',2],['Cambio De Domicilio',6],['Cambio De Equipo',2],['Soporte Empresarial',5],['Instalación Empresarial',8],['Recolección Pi',1],['Recolección',1],['Cambio De Plan',2],['Factibilidad',1],['No Aplica',0]];
 
 // Calcula puntos de una orden usando la tabla SERVICIOS actual (Ajustes)
@@ -1245,12 +1243,10 @@ function bono110(pct,est,meta,t){
   const threshold=Math.round(meta*1.1);
   return Math.min(Math.floor(Math.max(0,est-threshold)/6)*100,500);
 }
-function descuento(dist,inas){
+function descuento(dist,inas,base,b110){
   if(!DESC_D.has(dist)||inas===0)return 0;
-  // 1 inasistencia → 50% del bono de asistencia ($400 base)
-  // 2+ inasistencias → 100% del bono de asistencia
-  const rate=inas===1?0.5:1.0;
-  return Math.round(DESCUENTO_BASE*rate);
+  if(inas===1)return Math.round((base+b110)*0.5);
+  return base+b110;
 }
 
 function generateData(wk){
@@ -1284,7 +1280,7 @@ function generateData(wk){
       const inas=6-dias;
       const bb=bonoBase(pct,tipo);
       const b11=bono110(pct,est,meta,tipo);
-      const desc=descuento(dist,inas);
+      const desc=descuento(dist,inas,bb,b11);
       const bf=Math.max(0,Math.min(bb+b11-desc,BONO_CAP));
 
       // Histórico 10 semanas (con tendencia leve)
@@ -2528,7 +2524,7 @@ function renderFicha(t){
     <div class="des-row"><span class="des-key">Tipo de distrito</span><span class="des-val">Tipo ${t.tipo}</span></div>
     <div class="des-row"><span class="des-key">Bono base (${fp(t.pct)} de meta)</span><span class="des-val">${t.bonoBase>0?f$(t.bonoBase):'$0 (no alcanzó 80%)'}</span></div>
     <div class="des-row"><span class="des-key">Bono 110%+ extra</span><span class="des-val" style="color:var(--green)">${t.bono110>0?'+'+f$(t.bono110):'—'}</span></div>
-    <div class="des-row"><span class="des-key">Descuento inasistencias (${t.inas} día(s) · ${t.descuento>0?(t.inas===1?'50':'100')+'% de $400':'sin descuento'})</span><span class="des-val" style="color:var(--red)">${t.descuento>0?'−'+f$(t.descuento):'—'}</span></div>
+    <div class="des-row"><span class="des-key">Descuento por ${t.inas} inasistencia(s) ${t.descuento>0?'('+( t.inas===1?'50':'100')+'% del bono)':''}</span><span class="des-val" style="color:var(--red)">${t.descuento>0?'−'+f$(t.descuento):'—'}</span></div>
     <div class="des-row des-total"><span class="des-key">Bono Neto Final</span><span class="des-val">${f$(t.bonoFinal)}</span></div>`;
 }
 
@@ -2699,7 +2695,7 @@ function saveConfig(){
       t.pct=t.meta>0?Math.round(t.estrellas/t.meta*100):0;
       t.bonoBase=bonoBase(t.pct,t.tipo);
       t.bono110=bono110(t.pct,t.estrellas,t.meta,t.tipo);
-      t.descuento=descuento(t.distrito,t.inas);
+      t.descuento=descuento(t.distrito,t.inas,t.bonoBase,t.bono110);
       t.bonoFinal=Math.max(0,Math.min(t.bonoBase+t.bono110-t.descuento,BONO_CAP));
     });
   }
@@ -3043,7 +3039,7 @@ function rebuildFromRawOrders(){
       const inas=Math.max(0,6-dias);
       const bb  =bonoBase(pct,tipoDist);
       const b11 =bono110(pct,g.puntos,meta,tipoDist);
-      const desc=descuento(tech.dist,inas);
+      const desc=descuento(tech.dist,inas,bb,b11);
       const bf  =Math.max(0,Math.min(bb+b11-desc,BONO_CAP));
 
       newCoords[cid].ordenesSem+=g.ordenes.length;
