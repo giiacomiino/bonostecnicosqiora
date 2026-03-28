@@ -322,12 +322,18 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       </div>
       <div class="period-btn">
         <svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <select id="period-type" onchange="changePeriodType(this.value)" style="font-weight:700;color:var(--or);border:none;background:transparent;font-family:inherit;font-size:13px;cursor:pointer;outline:none;margin-right:4px">
+          <option value="sem">Semana</option>
+          <option value="mes">Mes</option>
+        </select>
+        <span style="color:var(--border);margin:0 2px;font-size:16px;line-height:1">|</span>
         <select id="week-sel" onchange="changeWeek(this.value)">
           <option value="0">Sem 1 — 29 Dic–4 Ene</option>
           <option value="1">Sem 2 — 5 Ene–11 Ene</option>
           <option value="2" selected>Sem 3 — 12 Ene–18 Ene</option>
           <option value="3">Sem 4 — 19 Ene–25 Ene</option>
         </select>
+        <select id="month-sel" style="display:none;border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;outline:none" onchange="changeMonth(this.value)"></select>
       </div>
       <select id="skill-filter" onchange="changeSkill(this.value)" style="border:1.5px solid var(--or-border);border-radius:8px;padding:6px 12px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:var(--or);background:var(--or-light);outline:none;cursor:pointer;border-left:3px solid var(--or)">
         <option value="">Todas las cuadrillas</option>
@@ -361,7 +367,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
             <div><div class="cc-title">Distribución por Tipo de OS</div><div class="cc-sub">Volumen operativo nacional según categoría</div></div>
             <span class="chip chip-gy">OPERATIVO</span>
           </div>
-          <div class="funnel-wrap" id="funnel-os"></div>
+          <div style="height:240px"><canvas id="chart-funnel-os"></canvas></div>
         </div>
 
         <!-- Cobertura tendencia -->
@@ -801,7 +807,7 @@ function changeSkill(v){
 let tecSearch='', tecDist='', tecSkill='', tecLevel='';
 let distSearch='', distType='';
 let coordSearch='', coordDist='';
-let chartTrend=null, chartCascade=null, chartOsDist=null, chartHistorico=null;
+let chartTrend=null, chartCascade=null, chartOsDist=null, chartHistorico=null, chartFunnelOS=null;
 
 function r(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 function ch(a){return a[Math.floor(Math.random()*a.length)];}
@@ -973,8 +979,11 @@ function renderNacional(){
   const totalBonos=fd.reduce((s,t)=>s+t.bonoFinal,0);
   const totalOS=fd.reduce((s,t)=>s+t.nOrdenes,0);
   const avgPct=total>0?(fd.reduce((s,t)=>s+t.pct,0)/total).toFixed(1):0;
-  const prodProm=activas>0?(totalOS/activas/6).toFixed(1):'—';
-  const cobColor=parseFloat(avgPct)>=100?'gr':parseFloat(avgPct)>=80?'or':'rd';
+  const nWeeks=window._periodWeeks||1;
+  const prodProm=activas>0?(totalOS/activas/(nWeeks*6)).toFixed(1):'—';
+  const conBono=fd.filter(t=>t.bonoFinal>0).length;
+  const cobPct=activas>0?(conBono/activas*100).toFixed(1):'0';
+  const cobColor=parseFloat(cobPct)>=80?'gr':parseFloat(cobPct)>=50?'or':'rd';
 
   document.getElementById('kpi-nacional').innerHTML=`
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)"><svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>MONTO TOTAL BONOS</div>
@@ -985,9 +994,9 @@ function renderNacional(){
       <div class="kpi-val dk">${activas.toLocaleString()}</div>
       <div class="kpi-sub">Con al menos 1 OS en la semana</div></div>
 
-    <div class="kpi-c green-top"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>COBERTURA NACIONAL</div>
-      <div class="kpi-val ${cobColor}">${avgPct}%</div>
-      <div><span class="status-tag ${parseFloat(avgPct)>=100?'st-green':parseFloat(avgPct)>=80?'st-orange':'st-red'}">${parseFloat(avgPct)>=100?'Meta alcanzada':parseFloat(avgPct)>=80?'En rango':'Bajo objetivo'}</span></div></div>
+    <div class="kpi-c green-top"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>COBERTURA DE BONO</div>
+      <div class="kpi-val ${cobColor}">${cobPct}%</div>
+      <div class="kpi-sub">${conBono} de ${activas} cuadrillas activas</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>PRODUCTIVIDAD PROM.</div>
       <div class="kpi-val dk">${prodProm}</div>
@@ -997,16 +1006,38 @@ function renderNacional(){
       <div class="kpi-val dk">${totalOS.toLocaleString()}</div>
       <div class="kpi-sub">Órdenes de servicio semana</div></div>`;
 
-  // Funnel OS — desglose real por tipo de servicio
+  // Distribución OS — horizontal bar chart (legible para todos los tipos)
   const tipoCount={};
   fd.forEach(t=>(t.semOrders||[]).forEach(o=>{tipoCount[o.tipo]=(tipoCount[o.tipo]||0)+1;}));
   const sortedTipos=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]);
-  const maxTipo=sortedTipos[0]?sortedTipos[0][1]:1;
-  document.getElementById('funnel-os').innerHTML=sortedTipos.length?sortedTipos.map(([tipo,cnt],i)=>{
-    const w=Math.round(cnt/maxTipo*100);
-    const pct=totalOS>0?(cnt/totalOS*100).toFixed(1):0;
-    return `<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(w,18)}%;background:${SVC_COLORS[i%SVC_COLORS.length]}">${tipo} (${pct}%)</div></div>`;
-  }).join(''):'<div style="color:var(--text3);font-size:12px;padding:16px 0">Sin datos — carga un archivo Excel</div>';
+  if(chartFunnelOS)chartFunnelOS.destroy();
+  const canvasFunnel=document.getElementById('chart-funnel-os');
+  if(sortedTipos.length){
+    chartFunnelOS=new Chart(canvasFunnel,{
+      type:'bar',
+      data:{
+        labels:sortedTipos.map(([t])=>t),
+        datasets:[{
+          data:sortedTipos.map(([,n])=>n),
+          backgroundColor:sortedTipos.map((_,i)=>SVC_COLORS[i%SVC_COLORS.length]),
+          borderRadius:4,borderSkipped:false,barThickness:18
+        }]
+      },
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{label:c=>`${c.parsed.x.toLocaleString()} OS (${totalOS>0?(c.parsed.x/totalOS*100).toFixed(1):0}%)`}}
+        },
+        scales:{
+          x:{grid:{color:'#F3F4F6'},ticks:{font:{size:10},callback:v=>v.toLocaleString()}},
+          y:{grid:{display:false},ticks:{font:{size:11},color:'#374151'}}
+        }
+      }
+    });
+  }else{
+    const ctx=canvasFunnel.getContext('2d');ctx.clearRect(0,0,canvasFunnel.width,canvasFunnel.height);
+  }
 
   // Tendencia semanal — usa datos reales si hay múltiples semanas
   let trendLabels=[], trendData=[];
@@ -1828,6 +1859,19 @@ function processWorkbook(wb,filename){
   window._currentRealWk=allWeeks[allWeeks.length-1]||null;
   if(window._currentRealWk)weekSel.value='WK_'+(allWeeks.length-1);
 
+  // Selector de meses
+  const monthSel=document.getElementById('month-sel');
+  const MNS=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const months=[...new Set(allWeeks.map(wk=>wk.slice(0,7)))].sort();
+  monthSel.innerHTML=months.map(ym=>{const[y,m]=ym.split('-');return `<option value="${ym}">${MNS[parseInt(m)-1]} ${y}</option>`;}).join('');
+  // Seleccionar el mes más reciente por defecto
+  if(months.length)monthSel.value=months[months.length-1];
+
+  // Resetear tipo de periodo a semana
+  document.getElementById('period-type').value='sem';
+  monthSel.style.display='none'; weekSel.style.display='';
+  window._periodWeeks=1;
+
   // ── PASO 2: agregar y calcular bonos usando Ajustes actuales ─────────────
   rebuildFromRawOrders();
 
@@ -1965,14 +2009,69 @@ function rebuildFromRawOrders(){
   allData=window._currentRealWk?newData.filter(t=>t.semana===window._currentRealWk):newData;
 }
 
+// Agrupa múltiples registros (tech,semana) en uno por técnico — para vista mensual
+function aggregateByTech(records){
+  const byId={};
+  records.forEach(t=>{
+    if(!byId[t.id])byId[t.id]={...t,nOrdenes:0,bonoFinal:0,bonoBase:0,bono110:0,descuento:0,semOrders:[],_pctSum:0,_pctN:0};
+    const a=byId[t.id];
+    a.nOrdenes+=t.nOrdenes; a.bonoFinal+=t.bonoFinal; a.bonoBase+=t.bonoBase;
+    a.bono110+=t.bono110; a.descuento+=t.descuento;
+    a.semOrders=a.semOrders.concat(t.semOrders||[]);
+    a._pctSum+=t.pct; a._pctN++;
+  });
+  return Object.values(byId).map(a=>({...a,pct:a._pctN>0?a._pctSum/a._pctN:0}));
+}
+
+// Actualiza allData + recalcula coordData desde esos registros
+function setAllDataAndCoords(records){
+  allData=records;
+  const cMap={};
+  records.forEach(t=>{
+    if(!cMap[t.coordId])cMap[t.coordId]={id:t.coordId,nombre:t.coordNombre,distrito:t.distrito,tecnicosIds:[],ordenesSem:0,alcanceMeta:0,_sumPct:0,_n:0};
+    const c=cMap[t.coordId];
+    if(!c.tecnicosIds.includes(t.id))c.tecnicosIds.push(t.id);
+    c.ordenesSem+=t.nOrdenes; c._sumPct+=t.pct; c._n++;
+  });
+  coordData=Object.values(cMap).map(c=>{
+    c.alcanceMeta=c._n>0?Math.round(c._sumPct/c._n):0;
+    c.prodProm=(c.ordenesSem/(c.tecnicosIds.length||1)/(window._periodWeeks||1)/6).toFixed(1);
+    return c;
+  });
+}
+
+function changePeriodType(v){
+  window._periodType=v;
+  const ws=document.getElementById('week-sel');
+  const ms=document.getElementById('month-sel');
+  if(v==='mes'){
+    ws.style.display='none'; ms.style.display='';
+    if(ms.value)changeMonth(ms.value);
+  }else{
+    ms.style.display='none'; ws.style.display='';
+    changeWeek(ws.value);
+  }
+}
+
+function changeMonth(ym){
+  if(!ym||!window._allRealData)return;
+  window._currentMonth=ym;
+  const monthWeeks=(window._realWeeks||[]).filter(wk=>wk.slice(0,7)===ym);
+  window._periodWeeks=monthWeeks.length||1;
+  const raw=window._allRealData.filter(t=>monthWeeks.includes(t.semana));
+  setAllDataAndCoords(aggregateByTech(raw));
+  renderAll();
+}
+
 function changeWeek(wOrIdx){
+  window._periodWeeks=1;
   if(window._realWeeks&&window._realWeeks.length){
     const sel=document.getElementById('week-sel');
     const opt=sel.options[sel.selectedIndex];
     const wk=opt?opt.getAttribute('data-wk'):null;
     if(wk&&window._allRealData){
       window._currentRealWk=wk;
-      allData=window._allRealData.filter(t=>t.semana===wk);
+      setAllDataAndCoords(window._allRealData.filter(t=>t.semana===wk));
       renderAll();
       return;
     }
@@ -2014,16 +2113,6 @@ function showDayDetail(dayIdx){
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
-function changeWeek(w){
-  currentWeek=parseInt(w);
-  coordData=[];
-  generateData(currentWeek);
-  renderNacional();
-  if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
-  if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
-  if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
-}
-
 generateData(currentWeek);
 renderNacional();
 renderConfig();
