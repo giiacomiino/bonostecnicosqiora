@@ -432,35 +432,13 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
           <svg viewBox="0 0 24 24" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Volver a Distritos
         </button>
-        <div class="dist-layout">
-          <!-- Left panel -->
-          <div class="dist-panel">
-            <div class="dp-sec">
-              <div class="dp-label">Tipo de Distrito</div>
-              <div class="dp-radio" id="dp-radio-a"><span class="rdot" id="rdot-a"></span>Distrito Tipo A</div>
-              <div class="dp-radio" id="dp-radio-b"><span class="rdot" id="rdot-b"></span>Distrito Tipo B</div>
-            </div>
-            <div class="dp-sec">
-              <div class="dp-name" id="dp-dname">—</div>
-              <div class="dp-id" id="dp-did">—</div>
-            </div>
-            <div class="dp-sec">
-              <div class="dp-nav on">
-                <svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-                Resumen General
-              </div>
-              <div class="dp-nav"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Metas</div>
-              <div class="dp-nav"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>Penalizaciones</div>
-              <div class="dp-nav"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Desempeño</div>
-            </div>
-            <div class="dp-sec">
-              <div class="dp-label">Estado del Sistema</div>
-              <div class="sys-status"><span class="dot-online"></span><span style="color:var(--green);font-weight:600;font-size:12px">En línea</span></div>
-              <div style="font-size:10px;color:var(--text3)">Última sincronización: Hace 5 mins</div>
-            </div>
+        <div>
+          <!-- District header -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+            <div style="font-size:18px;font-weight:800" id="dp-dname">—</div>
+            <span id="dp-did" style="font-size:11px;background:#F3F4F6;color:var(--text2);padding:2px 8px;border-radius:5px;font-weight:600">—</span>
+            <span id="rdot-a" style="display:none"></span><span id="rdot-b" style="display:none"></span>
           </div>
-
-          <!-- Right content -->
           <div>
             <div class="kpi-row kpi-5" id="kpi-dist"></div>
 
@@ -655,14 +633,11 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
           <!-- Heatmap asistencia -->
           <div class="cc">
             <div class="cc-head">
-              <div><div class="cc-title">Asistencia</div><div class="cc-sub">Últimos 30 días</div></div>
-              <span class="chip chip-gy">35 DÍAS</span>
+              <div><div class="cc-title">Registro de Actividad</div><div class="cc-sub">5 semanas · clic en día verde para ver órdenes</div></div>
+              <span class="chip chip-gy">5 SEMANAS</span>
             </div>
-            <div style="font-size:10px;color:var(--text3);margin-bottom:5px;display:flex;gap:4px">
-              <span style="flex:1;text-align:center">L</span><span style="flex:1;text-align:center">M</span><span style="flex:1;text-align:center">X</span><span style="flex:1;text-align:center">J</span><span style="flex:1;text-align:center">V</span><span style="flex:1;text-align:center">S</span><span style="flex:1;text-align:center;color:var(--red)">D</span>
-            </div>
-            <div class="heatmap" id="heatmap-grid"></div>
-            <div class="hm-legend" id="heatmap-legend"></div>
+            <div id="heatmap-grid" style="margin-bottom:4px"></div>
+            <div id="heatmap-legend"></div>
             <div id="day-detail-panel" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <div style="font-size:12px;font-weight:700;color:var(--text)" id="day-detail-title"></div>
@@ -921,9 +896,12 @@ async function loadFromSupabase(){
 async function uploadToSupabase(techMap,filename){
   setSbStatus('Subiendo datos…',null);
   try{
-    // Borrar datos anteriores
-    const{error:delErr}=await _sb.from('orders').delete().gte('id',0);
-    if(delErr)throw delErr;
+    // Borrar solo las semanas del nuevo Excel (conserva semanas anteriores)
+    const weeksInFile=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))];
+    if(weeksInFile.length){
+      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile);
+      if(delErr)throw delErr;
+    }
 
     // Construir filas
     const rows=[];
@@ -1387,8 +1365,6 @@ function renderDistDetail(d){
 
   document.getElementById('dp-dname').textContent=distShort(d);
   document.getElementById('dp-did').textContent='Tipo '+info.t;
-  document.getElementById('rdot-a').className='rdot'+(info.t==='A'?' on':'');
-  document.getElementById('rdot-b').className='rdot'+(info.t==='B'?' on':'');
 
   const lmColor=parseFloat(avgPct)>=100?'gr':parseFloat(avgPct)>=80?'or':'rd';
   const lmStatus=parseFloat(avgPct)>=100?'st-green':parseFloat(avgPct)>=90?'st-orange':'st-yellow';
@@ -1691,50 +1667,43 @@ function renderFicha(t){
       <div class="tec-name">${t.nombre}</div>
       <div class="tec-coord">Coordinador: ${t.coordNombre}</div>
       <div class="tec-metas">
-        <span class="tec-meta-i"><svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>${t.edad} años</span>
-        <span class="tec-meta-i"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${t.exp}</span>
         <span class="tec-meta-i"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Cuadrilla: ${t.skill}</span>
       </div>
       <div class="tec-tags">
-        <span class="tec-tag sp">${t.especialidad}</span>
         <span class="tec-tag sp">${distShort(t.distrito)}</span>
-        <span class="tec-tag id">ID: ${t.id}</span>
+        <span class="tec-tag id">FFM: ${t.id.replace('TEC-R-','')}</span>
       </div>
-    </div>
-    <div class="tec-actions">
-      <button class="btn-outline"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar PDF</button>
-      <button class="btn-primary"><svg width="13" height="13" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Enviar Feedback</button>
     </div>`;
 
-  // KPIs ficha
-  const alTic=t.pct;
-  const alCal=r(82,108);
-  const alProd=r(60,110);
-  const mc1=alTic>=100?'gr':alTic>=80?'or':'rd';
-  const mc2=alCal>=100?'gr':alCal>=80?'or':'rd';
-  const mc3=alProd>=80?'or':'rd';
+  // KPIs ficha — solo datos reales
+  const pctF=t.pct;
+  const mc1=pctF>=100?'gr':pctF>=80?'or':'rd';
 
   document.getElementById('kpi-ficha').innerHTML=`
-    <div class="kpi-c green-top"><div class="kpi-label">ALCANCE DE TICKETS</div>
-      <div class="kpi-val ${mc1}">${alTic.toFixed(1)}% <span style="font-size:12px">${alTic>=100?'+':''}${(alTic-100).toFixed(1)}%</span></div>
-      <div class="pb" style="margin-top:6px"><div class="pf" style="width:${Math.min(alTic,100)}%;background:${alTic>=100?'var(--green)':alTic>=80?'var(--or)':'var(--red)'}"></div></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:4px">${alTic>=100?'Meta superada':'En progreso'}</div></div>
+    <div class="kpi-c green-top"><div class="kpi-label">ALCANCE DE META</div>
+      <div class="kpi-val ${mc1}">${pctF.toFixed(1)}%</div>
+      <div class="pb" style="margin-top:6px"><div class="pf" style="width:${Math.min(pctF,100)}%;background:${pctF>=100?'var(--green)':pctF>=80?'var(--or)':'var(--red)'}"></div></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">Meta: ⭐ ${t.meta}</div></div>
 
-    <div class="kpi-c"><div class="kpi-label">ALCANCE CALIDAD</div>
-      <div class="kpi-val ${mc2}">${alCal.toFixed(0)}% <span style="font-size:12px">−1.2%</span></div>
-      <div class="pb" style="margin-top:6px"><div class="pf" style="width:${Math.min(alCal,100)}%;background:${alCal>=100?'var(--green)':'var(--yellow)'}"></div></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:4px">Cerca de la meta</div></div>
+    <div class="kpi-c"><div class="kpi-label">TOTAL OS SEMANA</div>
+      <div class="kpi-val dk">${t.nOrdenes}</div>
+      <div class="kpi-sub">Órdenes realizadas</div></div>
 
-    <div class="kpi-c ${alProd<80?'red-top':''}"><div class="kpi-label">ALCANCE PRODUCTIVIDAD</div>
-      <div class="kpi-val ${mc3}">${alProd.toFixed(0)}% <span style="font-size:10px;background:${alProd<80?'var(--red-l)':'var(--yellow-l)'};color:${alProd<80?'var(--red)':'var(--yellow)'};padding:2px 6px;border-radius:4px;font-weight:600">${alProd<80?'Bajo meta':'En rango'}</span></div>
-      <div class="pb" style="margin-top:6px"><div class="pf" style="width:${Math.min(alProd,100)}%;background:${alProd>=80?'var(--yellow)':'var(--red)'}"></div></div></div>
+    <div class="kpi-c"><div class="kpi-label">DÍAS TRABAJADOS</div>
+      <div class="kpi-val dk">${t.dias} <span style="font-size:14px;color:var(--text3)">/ 6</span></div>
+      <div class="kpi-sub">${t.inas>0?`<span style="color:var(--red)">${t.inas} inasistencia(s)</span>`:'Sin inasistencias'}</div></div>
 
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">BONO NETO FINAL</div>
-      <div class="kpi-val or">${f$(t.bonoFinal)} <span style="font-size:12px;color:var(--green)">+3.1%</span></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:4px">Corte semana actual</div></div>`;
+      <div class="kpi-val or">${f$(t.bonoFinal)}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">${t.bonoBase>0?'Base: '+f$(t.bonoBase):'No alcanzó 80% de meta'}</div></div>`;
 
-  // Histórico bonos
-  const weeks=['S15','S16','S17','S18','S19','S20','S21','S22','S23','S24'];
+  // Histórico bonos — etiquetas reales de semanas
+  const MNS3=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  let weeks=window._realWeeks
+    ?window._realWeeks.slice(-10).map(wk=>{const m=getMondayOfWeek(new Date(wk+'T12:00:00'));return `${m.getDate()} ${MNS3[m.getMonth()]}`;})
+    :[];
+  while(weeks.length<10)weeks.unshift('');
+  weeks.splice(10);
   if(chartHistorico)chartHistorico.destroy();
   chartHistorico=new Chart(document.getElementById('chart-historico'),{
     type:'line',
@@ -1743,22 +1712,49 @@ function renderFicha(t){
       scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}}}}
   });
 
-  // Heatmap clickeable
+  // Heatmap — semanas con fechas y clickable
   window._curOrdersByDay=t.ordersByDay||{};
   document.getElementById('day-detail-panel').style.display='none';
-  const hm=document.getElementById('heatmap-grid');
-  hm.innerHTML=t.asistencia.map((v,di)=>{
-    const cls=v==='p'?'hm-p':v==='a'?'hm-a':'hm-r';
-    const clickable=v==='p'&&window._curOrdersByDay[di];
-    return `<div class="hm-cell ${cls}" style="cursor:${clickable?'pointer':'default'};${clickable?'box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.18)':''}" title="${clickable?'Ver órdenes del día':v==='a'?'Inasistencia':'Descanso'}" ${clickable?`onclick="showDayDetail(${di})"`:''} ></div>`;
-  }).join('');
-  const pCount=t.asistencia.filter(v=>v==='p').length;
-  const aCount=t.asistencia.filter(v=>v==='a').length;
-  const rCount=t.asistencia.filter(v=>v==='r').length;
+  const hmStart=window._hmStart||new Date();
+  const WDYS=['L','M','X','J','V','S','D'];
+  const MNS4=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  let hmHtml=`<div style="display:flex;margin-bottom:5px;align-items:center">
+    <div style="width:52px;flex-shrink:0"></div>
+    ${WDYS.map(d=>`<div style="flex:1;text-align:center;font-size:9px;font-weight:700;color:var(--text3)">${d}</div>`).join('')}
+  </div>`;
+  let pCount=0,aCount=0;
+  for(let wk=0;wk<5;wk++){
+    const wkMon=new Date(hmStart);wkMon.setDate(wkMon.getDate()+wk*7);
+    const wkLabel=`${wkMon.getDate()} ${MNS4[wkMon.getMonth()]}`;
+    hmHtml+=`<div style="display:flex;align-items:center;margin-bottom:3px">
+      <div style="width:52px;flex-shrink:0;font-size:9px;color:var(--text3);line-height:1.2">${wkLabel}</div>`;
+    for(let day=0;day<7;day++){
+      const di=wk*7+day;
+      const v=(t.asistencia||[])[di]||'r';
+      const dd=new Date(hmStart);dd.setDate(dd.getDate()+di);
+      const dateN=dd.getDate();
+      const clickable=v==='p'&&window._curOrdersByDay[di];
+      const nOS=clickable?window._curOrdersByDay[di].length:0;
+      if(v==='p')pCount++;else if(v==='a')aCount++;
+      const bg=v==='p'?'#22C55E':v==='a'?'#EF4444':'#E9EAEC';
+      const txtCol=(v==='r')?'#9CA3AF':'white';
+      const border=clickable?'border:2px solid #15803D;':'border:2px solid transparent;';
+      const cursor=clickable?'pointer':'default';
+      const title=clickable?`${dd.getDate()} ${MNS4[dd.getMonth()]} — ${nOS} órdenes · clic para ver`:v==='a'?`${dd.getDate()} ${MNS4[dd.getMonth()]} — Inasistencia`:`${dd.getDate()} ${MNS4[dd.getMonth()]}`;
+      hmHtml+=`<div style="flex:1;aspect-ratio:1;background:${bg};${border}border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${cursor};margin:0 1px" title="${title}" ${clickable?`onclick="showDayDetail(${di})"`:''}>
+        <span style="font-size:9px;font-weight:700;color:${txtCol};line-height:1">${dateN}</span>
+        ${clickable?`<span style="font-size:7px;color:rgba(255,255,255,.9);line-height:1.2">${nOS} OS</span>`:''}
+      </div>`;
+    }
+    hmHtml+='</div>';
+  }
+  document.getElementById('heatmap-grid').innerHTML=hmHtml;
   document.getElementById('heatmap-legend').innerHTML=`
-    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-p"></span>Asistencia (${pCount})</span><span class="hm-leg-pct">${(pCount/35*100).toFixed(0)}%</span></div>
-    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-a"></span>Inasistencia (${aCount})</span><span class="hm-leg-pct" style="color:var(--red)">${(aCount/35*100).toFixed(0)}%</span></div>
-    <div class="hm-leg-i"><span class="hm-leg-l"><span class="hm-leg-dot hm-r"></span>Descansos (${rCount})</span><span class="hm-leg-pct">${(rCount/35*100).toFixed(0)}%</span></div>`;
+    <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:11px;height:11px;background:#22C55E;border-radius:3px;border:2px solid #15803D"></div>Con órdenes (${pCount} días) — clic para ver detalle</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:11px;height:11px;background:#EF4444;border-radius:3px"></div>Inasistencia (${aCount} días)</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:11px;height:11px;background:#E9EAEC;border-radius:3px"></div>Descanso / sin datos</div>
+    </div>`;
 
   // Desglose
   document.getElementById('desglose-body').innerHTML=`
@@ -2378,9 +2374,6 @@ function changeWeek(wOrIdx){
       return;
     }
   }
-  // Mock data: regenerar
-  currentWeek=parseInt(wOrIdx);coordData=[];generateData(currentWeek);
-  renderAll();
 }
 
 // ═══════════════════════════════════════════
@@ -2413,12 +2406,12 @@ function showDayDetail(dayIdx){
 }
 
 // ═══════════════════════════════════════════
-// INIT
+// INIT — sin datos falsos; todo viene de Supabase
 // ═══════════════════════════════════════════
-generateData(currentWeek);
+allData=[];
+coordData=[];
 renderNacional();
 renderConfig();
-// Auto-cargar desde Supabase al abrir
 loadFromSupabase();
 </script>
 </body>
