@@ -1177,10 +1177,13 @@ function bonoBase(pct,t){
   const b=BONOS[t]||BONOS.B;
   if(pct<80)return 0; if(pct<90)return b['80']; if(pct<100)return b['90']; return b['100'];
 }
+const BONO_CAP=3000;
 function bono110(pct,est,meta,t){
   if(pct<110)return 0;
-  if(t==='A')return 500;
-  return Math.min(Math.floor((est-meta)/6)*100,500);
+  if(t==='A')return 500; // Tipo A: $500 fijo al superar 110%
+  // Tipo B: $100 por cada 6 estrellas sobre el umbral del 110%, tope $500
+  const threshold=Math.round(meta*1.1);
+  return Math.min(Math.floor(Math.max(0,est-threshold)/6)*100,500);
 }
 function descuento(dist,inas,base,b110){
   if(!DESC_D.has(dist))return 0;
@@ -1221,7 +1224,7 @@ function generateData(wk){
       const bb=bonoBase(pct,tipo);
       const b11=bono110(pct,est,meta,tipo);
       const desc=descuento(dist,inas,bb,b11);
-      const bf=Math.max(0,bb+b11-desc);
+      const bf=Math.max(0,Math.min(bb+b11-desc,BONO_CAP));
 
       // Histórico 10 semanas (con tendencia leve)
       const hist=[];
@@ -2450,7 +2453,7 @@ function saveConfig(){
       t.bonoBase=bonoBase(t.pct,t.tipo);
       t.bono110=bono110(t.pct,t.estrellas,t.meta,t.tipo);
       t.descuento=descuento(t.distrito,t.inas,t.bonoBase,t.bono110);
-      t.bonoFinal=Math.max(0,t.bonoBase+t.bono110-t.descuento);
+      t.bonoFinal=Math.max(0,Math.min(t.bonoBase+t.bono110-t.descuento,BONO_CAP));
     });
   }
   renderAll();
@@ -2794,7 +2797,7 @@ function rebuildFromRawOrders(){
       const bb  =bonoBase(pct,tipoDist);
       const b11 =bono110(pct,g.puntos,meta,tipoDist);
       const desc=descuento(tech.dist,inas,bb,b11);
-      const bf  =Math.max(0,bb+b11-desc);
+      const bf  =Math.max(0,Math.min(bb+b11-desc,BONO_CAP));
 
       newCoords[cid].ordenesSem+=g.ordenes.length;
       newCoords[cid]._sumPct+=pct;
