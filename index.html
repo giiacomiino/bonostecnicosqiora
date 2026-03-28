@@ -763,6 +763,14 @@ const METAS={
 const BONOS={A:{'80':500,'90':900,'100':2500},B:{'80':450,'90':800,'100':1800}};
 const DESC_D=new Set(['CTA-TPI-INT-IRA IRAPUATO','CTA-TPI-INT-LON LEON','CTA-TPI-INT-GBA GDL BARRANCA','CTA-TPI-INT-GES GDL ESTADIO','CTA-TPI-INT-GLM GDL LOPEZ MATEOS','CTA-TPI-INT-GPR GDL PRIMAVERA']);
 const SERVICIOS=[['Instalación',6],['Soporte',3],['Mantenimiento Mayor',4],['Mantenimiento',3],['Addons',2],['Cambio De Domicilio',6],['Cambio De Equipo',2],['Soporte Empresarial',5],['Instalación Empresarial',8],['Recolección Pi',1],['Recolección',1],['Cambio De Plan',2],['Factibilidad',1],['No Aplica',0]];
+
+// Calcula puntos de una orden usando la tabla SERVICIOS actual (Ajustes)
+function svcPoints(tipo){
+  const t=(tipo||'').toString().toLowerCase().trim();
+  for(const [s,p] of SERVICIOS){if(s.toLowerCase().trim()===t)return p;}
+  for(const [s,p] of SERVICIOS){const sl=s.toLowerCase().trim();if(t.includes(sl)||sl.includes(t))return p;}
+  return 0;
+}
 const SKILLS=['Normal','Moto','Hibrida','Elite','Multidistrito'];
 const SK_KEY={Normal:'N',Moto:'Mo',Hibrida:'H',Elite:'E',Multidistrito:'Mu'};
 const SK_CLASS={Normal:'sp-N',Moto:'sp-Mo',Hibrida:'sp-H',Elite:'sp-E',Multidistrito:'sp-Mu'};
@@ -1548,38 +1556,61 @@ function updateMetaTipo(dist,val){METAS[dist].t=val;}
 function updateDescD(dist,checked){if(checked)DESC_D.add(dist);else DESC_D.delete(dist);}
 
 function saveConfig(){
-  // Read meta inputs
+  // Leer metas por distrito
   Object.entries(METAS).forEach(([d,info])=>{
     const tid=d.replace(/[^a-z0-9]/gi,'_');
-    const g=id=>{const el=document.getElementById(id);return el?parseInt(el.value)||0:null;};
-    if(g('N_'+tid)!==null){info.N=g('N_'+tid);info.Mo=g('Mo_'+tid);info.H=g('H_'+tid);info.E=g('E_'+tid);info.Mu=g('Mu_'+tid);}
+    const gv=id=>{const el=document.getElementById(id);return el?parseInt(el.value)||0:null;};
+    if(gv('N_'+tid)!==null){info.N=gv('N_'+tid);info.Mo=gv('Mo_'+tid);info.H=gv('H_'+tid);info.E=gv('E_'+tid);info.Mu=gv('Mu_'+tid);}
   });
-  // Read bono inputs
+  // Leer montos de bono
   BONOS.A['80']=parseInt(document.getElementById('bonoA80').value)||500;
   BONOS.A['90']=parseInt(document.getElementById('bonoA90').value)||900;
   BONOS.A['100']=parseInt(document.getElementById('bonoA100').value)||2500;
   BONOS.B['80']=parseInt(document.getElementById('bonoB80').value)||450;
   BONOS.B['90']=parseInt(document.getElementById('bonoB90').value)||800;
   BONOS.B['100']=parseInt(document.getElementById('bonoB100').value)||1800;
-  // Read service inputs
-  SERVICIOS.forEach((_,i)=>{const el=document.getElementById('svc_'+i);if(el)SERVICIOS[i][1]=parseInt(el.value)||1;});
-  // Recalculate bonuses for all data
-  allData.forEach(t=>{
-    const info=METAS[t.distrito]||{t:'B'};
-    const sk=SK_KEY[t.skill]||'N';
-    t.meta=info[sk]||info.N||84;
-    t.tipo=info.t;
-    t.pct=t.meta>0?Math.round(t.estrellas/t.meta*100):0;
-    t.bonoBase=bonoBase(t.pct,t.tipo);
-    t.bono110=bono110(t.pct,t.estrellas,t.meta,t.tipo);
-    t.descuento=descuento(t.distrito,t.inas,t.bonoBase,t.bono110);
-    t.bonoFinal=Math.max(0,t.bonoBase+t.bono110-t.descuento);
-  });
-  // Re-render active view
-  renderNacional();
+  // Leer ponderaciones de servicio
+  SERVICIOS.forEach((_,i)=>{const el=document.getElementById('svc_'+i);if(el)SERVICIOS[i][1]=parseInt(el.value)||0;});
+
+  if(window._techMap){
+    // Datos reales: recalcular desde órdenes crudas con nuevos ajustes
+    rebuildFromRawOrders();
+  }else{
+    // Datos mock: recalcular bonos con nueva config de metas y bonos
+    allData.forEach(t=>{
+      const info=METAS[t.distrito]||{t:'B'};
+      const sk=SK_KEY[t.skill]||'N';
+      t.meta=info[sk]||info.N||84;
+      t.tipo=info.t;
+      t.pct=t.meta>0?Math.round(t.estrellas/t.meta*100):0;
+      t.bonoBase=bonoBase(t.pct,t.tipo);
+      t.bono110=bono110(t.pct,t.estrellas,t.meta,t.tipo);
+      t.descuento=descuento(t.distrito,t.inas,t.bonoBase,t.bono110);
+      t.bonoFinal=Math.max(0,t.bonoBase+t.bono110-t.descuento);
+    });
+  }
+  renderAll();
   const msg=document.getElementById('cfg-saved-msg');
   msg.style.display='block';
   setTimeout(()=>msg.style.display='none',3000);
+}
+
+// Renderiza la vista activa + nacional (se llama tras cambiar semana o config)
+function renderAll(){
+  renderNacional();
+  const dv=id=>document.getElementById(id);
+  if(dv('view-distritos').classList.contains('active')){
+    if(dv('dist-detail-view').style.display!=='none'&&selDistrito)renderDistDetail(selDistrito);
+    else renderDistList();
+  }
+  if(dv('view-coordinadores').classList.contains('active')){
+    if(dv('coord-detail-view').style.display!=='none'&&selCoord)renderCoordDetail(coordData.find(c=>c.id===selCoord));
+    else renderCoordList();
+  }
+  if(dv('view-tecnicos').classList.contains('active')){
+    if(dv('tec-ficha-view').style.display!=='none'&&selTecnico){const t=getFiltered().find(x=>x.id===selTecnico);if(t)renderFicha(t);}
+    else applyTecFilters();
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1728,7 +1759,7 @@ function processWorkbook(wb,filename){
 
   const clean=v=>(v||'').toString().replace(/[\n\t\r]+/g,' ').replace(/\s+/g,' ').trim();
 
-  // Paso 1: recolectar TODAS las órdenes por técnico (clave = FFM)
+  // ── PASO 1: leer todas las órdenes → techMap ─────────────────────────────
   const techMap={};
   let minDate=null, maxDate=null;
 
@@ -1743,24 +1774,20 @@ function processWorkbook(wb,filename){
     if(!fecha)return;
 
     const rawDist=clean(row[C.dist1]||'');
-    // Distrito.1 ya viene en formato CTA-TPI-INT; verificar directamente en METAS
     const dist=METAS[rawDist]?rawDist:(normDist(rawDist)||Object.keys(METAS)[0]);
     const skill=normSkill(clean(row[C.skill]||''));
-    const puntos=parseFloat(row[C.puntos])||0;
     const osNum =clean(row[C.os]||'');
     const otNum =clean(row[C.ot]||'');
+    // 'Tipo' es el tipo de servicio que se usa para calcular puntos con svcPoints
     const tipo  =clean(row[C.tipo]||row[C.servicio]||'Soporte');
     const wk    =weekKey(fecha);
-    // Usar fecha local (evitar toISOString que usa UTC)
     const dia   =fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0')+'-'+String(fecha.getDate()).padStart(2,'0');
 
-    if(!techMap[techKey]){
-      techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,orders:[]};
-    }
-    // Actualizar dist/skill con valor concreto (no default) cuando se encuentre
+    if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,orders:[]};
     if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
 
-    techMap[techKey].orders.push({fecha,puntos,os:osNum,ot:otNum,tipo,wk,dia});
+    // Guardamos tipo (no puntos) → los puntos se calculan en rebuildFromRawOrders con SERVICIOS actuales
+    techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
 
     if(!minDate||fecha<minDate)minDate=fecha;
     if(!maxDate||fecha>maxDate)maxDate=fecha;
@@ -1768,89 +1795,117 @@ function processWorkbook(wb,filename){
 
   const allWeeks=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))].sort();
 
-  // Inicio del heatmap de 35 días: lunes de la primera semana en los datos
-  const hmStart=getMondayOfWeek(minDate||new Date());
+  // Persistir estado para que rebuildFromRawOrders pueda recalcular en cualquier momento
+  window._techMap    =techMap;
+  window._realWeeks  =allWeeks;
+  window._minDate    =minDate;
+  window._maxDate    =maxDate;
+  window._hmStart    =getMondayOfWeek(minDate||new Date());
 
-  // Paso 2: construir registros por técnico × semana
-  const newData=[];
-  const newCoords={};
+  // Selector de semanas
+  const weekSel=document.getElementById('week-sel');
+  weekSel.innerHTML=allWeeks.map((wk,i)=>`<option value="WK_${i}" data-wk="${wk}">${formatWeekLabel(getMondayOfWeek(new Date(wk+'T12:00:00')))}</option>`).join('');
+  window._currentRealWk=allWeeks[allWeeks.length-1]||null;
+  if(window._currentRealWk)weekSel.value='WK_'+(allWeeks.length-1);
+
+  // ── PASO 2: agregar y calcular bonos usando Ajustes actuales ─────────────
+  rebuildFromRawOrders();
+
+  document.getElementById('source-label').textContent=filename;
+  document.getElementById('load-btn-label').textContent='Actualizar';
+  renderAll();
+
+  const nTecs=Object.keys(techMap).length;
+  const nOrds=Object.values(techMap).reduce((s,t)=>s+t.orders.length,0);
+  alert(`✅ Datos cargados exitosamente\n\nTécnicos: ${nTecs} | Órdenes: ${nOrds.toLocaleString()}\nSemanas: ${allWeeks.length}`);
+}
+
+// ═══════════════════════════════════════════
+// RECALCULAR DESDE ÓRDENES CRUDAS
+// Usa window._techMap + METAS, BONOS, SERVICIOS actuales (desde Ajustes)
+// Se llama tras loadExcel o tras Guardar en Ajustes
+// ═══════════════════════════════════════════
+function rebuildFromRawOrders(){
+  if(!window._techMap||!window._realWeeks)return;
+  const techMap  =window._techMap;
+  const allWeeks =window._realWeeks;
+  const hmStart  =window._hmStart||new Date();
+  const minDate  =window._minDate;
+  const maxDate  =window._maxDate;
+
+  const newData   =[];
+  const newCoords ={};
 
   Object.values(techMap).forEach(tech=>{
-    // Agrupar órdenes por semana
+    // Reagrupar órdenes por semana calculando puntos con SERVICIOS actuales
     const byWk={};
     tech.orders.forEach(o=>{
+      const pts=svcPoints(o.tipo); // ← usa tabla de Ajustes
       if(!byWk[o.wk])byWk[o.wk]={puntos:0,diasSet:new Set(),ordenes:[]};
-      byWk[o.wk].puntos+=o.puntos;
-      const dow=o.fecha.getDay(); // 0=Dom, 1=Lun … 6=Sáb
-      if(dow!==0)byWk[o.wk].diasSet.add(o.dia); // solo días Lun-Sáb como presencia laboral
-      byWk[o.wk].ordenes.push(o);
+      byWk[o.wk].puntos+=pts;
+      if(o.fecha.getDay()!==0)byWk[o.wk].diasSet.add(o.dia);
+      byWk[o.wk].ordenes.push({...o,puntos:pts});
     });
 
-    // Heatmap 35 días: historial completo del técnico
+    // Heatmap 35 días con historial completo del técnico
     const techDaySet=new Set(tech.orders.map(o=>o.dia));
     const asist=[];
     const ordersByDayFull={};
     for(let di=0;di<35;di++){
       const d=new Date(hmStart);d.setDate(d.getDate()+di);
       const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      const dow=d.getDay();
-      if(dow===0){asist.push('r');}
+      if(d.getDay()===0){asist.push('r');}
       else if(techDaySet.has(dStr)){
         asist.push('p');
         const dayOrds=tech.orders.filter(o=>o.dia===dStr).sort((a,b)=>a.fecha-b.fecha);
         if(dayOrds.length){
           ordersByDayFull[di]=dayOrds.map(o=>({
-            os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,estrellas:o.puntos,
+            os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,
+            estrellas:svcPoints(o.tipo), // puntos actualizados con Ajustes
             hora:o.fecha.toTimeString().slice(0,5),fecha:dStr
           }));
         }
       }else{
-        const inRange=d>=minDate&&d<=maxDate;
-        asist.push(inRange?'a':'r');
+        asist.push((minDate&&maxDate&&d>=minDate&&d<=maxDate)?'a':'r');
       }
     }
 
-    // Metainfo del técnico
+    // Metas y tipo de distrito desde METAS (Ajustes)
     const metaInfo=METAS[tech.dist]||{t:'B',N:84,Mo:70,H:84,E:84,Mu:84};
-    const skKey=SK_KEY[tech.skill]||'N';
-    const meta=metaInfo[skKey]||metaInfo.N||84;
-    const tipo=metaInfo.t||'B';
+    const skKey   =SK_KEY[tech.skill]||'N';
+    const meta    =metaInfo[skKey]||metaInfo.N||84;
+    const tipoDist=metaInfo.t||'B';
 
-    // Historial de bonos base por semana (para gráfica)
+    // Historial de bonos base por semana (gráfica técnico)
     const histAll=allWeeks.map(wk=>{
       const wd=byWk[wk];if(!wd)return 0;
-      return Math.max(0,bonoBase(wd.puntos/meta*100,tipo));
+      return Math.max(0,bonoBase(wd.puntos/meta*100,tipoDist));
     });
-    while(histAll.length<10)histAll.unshift(0);
-    histAll.splice(10);
+    while(histAll.length<10)histAll.unshift(0);histAll.splice(10);
 
-    // Coordinador: uno por distrito
+    // Coordinador = uno por distrito
     const cid='COORD-'+tech.dist.replace(/[^a-z0-9]/gi,'_');
-    if(!newCoords[cid]){
-      newCoords[cid]={id:cid,nombre:'Coord. '+distShort(tech.dist),
-        distrito:tech.dist,tecnicosIds:[],ordenesSem:0,alcanceMeta:0,_sumPct:0,_n:0};
-    }
+    if(!newCoords[cid])newCoords[cid]={id:cid,nombre:'Coord. '+distShort(tech.dist),
+      distrito:tech.dist,tecnicosIds:[],ordenesSem:0,alcanceMeta:0,_sumPct:0,_n:0};
     const tecId='TEC-R-'+tech.ffm;
     if(!newCoords[cid].tecnicosIds.includes(tecId))newCoords[cid].tecnicosIds.push(tecId);
 
-    // Un registro por semana que el técnico trabajó
+    // Un registro por semana trabajada
     allWeeks.forEach(wk=>{
-      const g=byWk[wk];
-      if(!g)return; // este técnico no tiene registros esta semana
-
-      const pct=meta>0?(g.puntos/meta*100):0;
+      const g=byWk[wk];if(!g)return;
+      const pct =meta>0?(g.puntos/meta*100):0;
       const dias=g.diasSet.size;
       const inas=Math.max(0,6-dias);
-      const bb =bonoBase(pct,tipo);
-      const b11=bono110(pct,g.puntos,meta,tipo);
+      const bb  =bonoBase(pct,tipoDist);
+      const b11 =bono110(pct,g.puntos,meta,tipoDist);
       const desc=descuento(tech.dist,inas,bb,b11);
-      const bf =Math.max(0,bb+b11-desc);
+      const bf  =Math.max(0,bb+b11-desc);
 
       newCoords[cid].ordenesSem+=g.ordenes.length;
       newCoords[cid]._sumPct+=pct;
       newCoords[cid]._n++;
 
-      // ordersByDay relativo al lunes de esta semana (para tab de día en heatmap)
+      // ordersByDay relativo al lunes de la semana (para click en heatmap ficha)
       const wkMon=getMondayOfWeek(new Date(wk+'T12:00:00'));
       const ordersByDay={};
       g.ordenes.forEach(o=>{
@@ -1864,21 +1919,18 @@ function processWorkbook(wb,filename){
       Object.values(ordersByDay).forEach(arr=>arr.sort((a,b)=>a.hora.localeCompare(b.hora)));
 
       newData.push({
-        id:tecId, nombre:tech.nombre,
-        coordId:cid, coordNombre:newCoords[cid].nombre,
-        distrito:tech.dist, skill:tech.skill, meta, tipo,
-        estrellas:g.puntos, pct, dias, inas,
-        bonoBase:bb, bono110:b11, descuento:desc, bonoFinal:bf,
-        historial:histAll.slice(),
-        asistencia:asist,       // historial completo 35 días
-        ordersByDay:ordersByDayFull, // usar historial completo para clicks en heatmap
-        especialidad:'FIBRA ÓPTICA', edad:30, exp:'—',
+        id:tecId,nombre:tech.nombre,coordId:cid,coordNombre:newCoords[cid].nombre,
+        distrito:tech.dist,skill:tech.skill,meta,tipo:tipoDist,
+        estrellas:g.puntos,pct,dias,inas,
+        bonoBase:bb,bono110:b11,descuento:desc,bonoFinal:bf,
+        historial:histAll.slice(),asistencia:asist,
+        ordersByDay:ordersByDayFull,
+        especialidad:'FIBRA ÓPTICA',edad:30,exp:'—',
         semana:wk,
       });
     });
   });
 
-  // Finalizar coordinadores
   const newCoordArr=Object.values(newCoords).map(c=>{
     c.alcanceMeta=c._n>0?Math.round(c._sumPct/c._n):0;
     c.prodProm=(c.ordenesSem/(c.tecnicosIds.length||1)/6).toFixed(1);
@@ -1886,34 +1938,8 @@ function processWorkbook(wb,filename){
   });
 
   window._allRealData=newData;
-  window._techMap=techMap;
-  allData=newData;
   coordData=newCoordArr;
-
-  // Selector de semanas
-  const weekSel=document.getElementById('week-sel');
-  weekSel.innerHTML=allWeeks.map((wk,i)=>{
-    return `<option value="WK_${i}" data-wk="${wk}">${formatWeekLabel(getMondayOfWeek(new Date(wk+'T12:00:00')))}</option>`;
-  }).join('');
-  window._realWeeks=allWeeks;
-  window._currentRealWk=allWeeks[allWeeks.length-1]||null;
-
-  // Filtrar a última semana por defecto
-  if(window._currentRealWk){
-    allData=newData.filter(t=>t.semana===window._currentRealWk);
-    weekSel.value='WK_'+(allWeeks.length-1);
-  }
-
-  document.getElementById('source-label').textContent=filename;
-  document.getElementById('load-btn-label').textContent='Actualizar';
-  renderNacional();
-  if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
-  if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
-  if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
-
-  const nTecs=Object.keys(techMap).length;
-  const nOrds=Object.values(techMap).reduce((s,t)=>s+t.orders.length,0);
-  alert(`✅ Datos cargados exitosamente\n\nTécnicos: ${nTecs} | Órdenes: ${nOrds.toLocaleString()}\nSemanas: ${allWeeks.length}`);
+  allData=window._currentRealWk?newData.filter(t=>t.semana===window._currentRealWk):newData;
 }
 
 function changeWeek(wOrIdx){
@@ -1924,19 +1950,13 @@ function changeWeek(wOrIdx){
     if(wk&&window._allRealData){
       window._currentRealWk=wk;
       allData=window._allRealData.filter(t=>t.semana===wk);
-      renderNacional();
-      if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
-      if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
-      if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
+      renderAll();
       return;
     }
   }
   // Mock data: regenerar
   currentWeek=parseInt(wOrIdx);coordData=[];generateData(currentWeek);
-  renderNacional();
-  if(document.getElementById('view-distritos').classList.contains('active'))renderDistList();
-  if(document.getElementById('view-coordinadores').classList.contains('active'))renderCoordList();
-  if(document.getElementById('view-tecnicos').classList.contains('active'))applyTecFilters();
+  renderAll();
 }
 
 // ═══════════════════════════════════════════
