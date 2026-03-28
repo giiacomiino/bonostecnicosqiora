@@ -778,6 +778,8 @@ const NMX=['Carlos Ramírez','Luis Hernández','Jorge Martínez','Miguel García
 const CNMX=['Carlos Méndez','Elena Ríos','Jorge Soto','Mario Vázquez','Lucía Domínguez','Roberto Díaz','Sara López','Felipe Aguilar','Natalia Cruz','Héctor Torres'];
 const ESPECIALIDADES=['FIBRA ÓPTICA','COBRE','FIBRA ÓPTICA','MIXTO','FIBRA ÓPTICA'];
 const OR_SHADES=['#E85420','#F0703A','#F58050','#F89060','#FAA070'];
+// Paleta extendida para todos los tipos de servicio (hasta 14)
+const SVC_COLORS=['#E85420','#2563EB','#16A34A','#7C3AED','#D97706','#DC2626','#0891B2','#059669','#9333EA','#B45309','#0284C7','#65A30D','#C026D3','#475569'];
 
 // ═══════════════════════════════════════════
 // DATA
@@ -971,7 +973,7 @@ function renderNacional(){
   const totalBonos=fd.reduce((s,t)=>s+t.bonoFinal,0);
   const totalOS=fd.reduce((s,t)=>s+t.nOrdenes,0);
   const avgPct=total>0?(fd.reduce((s,t)=>s+t.pct,0)/total).toFixed(1):0;
-  const prodProm=activas>0?(totalOS/activas).toFixed(1):'—';
+  const prodProm=activas>0?(totalOS/activas/6).toFixed(1):'—';
   const cobColor=parseFloat(avgPct)>=100?'gr':parseFloat(avgPct)>=80?'or':'rd';
 
   document.getElementById('kpi-nacional').innerHTML=`
@@ -989,7 +991,7 @@ function renderNacional(){
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>PRODUCTIVIDAD PROM.</div>
       <div class="kpi-val dk">${prodProm}</div>
-      <div class="kpi-sub">OS por cuadrilla activa</div></div>
+      <div class="kpi-sub">OS / cuadrilla activa / día</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>TOTAL OS PROCESADAS</div>
       <div class="kpi-val dk">${totalOS.toLocaleString()}</div>
@@ -998,12 +1000,12 @@ function renderNacional(){
   // Funnel OS — desglose real por tipo de servicio
   const tipoCount={};
   fd.forEach(t=>(t.semOrders||[]).forEach(o=>{tipoCount[o.tipo]=(tipoCount[o.tipo]||0)+1;}));
-  const sortedTipos=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const sortedTipos=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]);
   const maxTipo=sortedTipos[0]?sortedTipos[0][1]:1;
   document.getElementById('funnel-os').innerHTML=sortedTipos.length?sortedTipos.map(([tipo,cnt],i)=>{
     const w=Math.round(cnt/maxTipo*100);
     const pct=totalOS>0?(cnt/totalOS*100).toFixed(1):0;
-    return `<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(w,18)}%;background:${OR_SHADES[i]}">${tipo} (${pct}%)</div></div>`;
+    return `<div class="funnel-bar-wrap"><div class="funnel-bar" style="width:${Math.max(w,18)}%;background:${SVC_COLORS[i%SVC_COLORS.length]}">${tipo} (${pct}%)</div></div>`;
   }).join(''):'<div style="color:var(--text3);font-size:12px;padding:16px 0">Sin datos — carga un archivo Excel</div>';
 
   // Tendencia semanal — usa datos reales si hay múltiples semanas
@@ -1129,7 +1131,7 @@ function renderDistDetail(d){
   const totalB=tecs.reduce((s,t)=>s+t.bonoFinal,0);
   const totalOS=tecs.reduce((s,t)=>s+t.nOrdenes,0);
   const avgPct=total>0?(tecs.reduce((s,t)=>s+t.pct,0)/total).toFixed(1):'0';
-  const prodProm=activas>0?(totalOS/activas).toFixed(1):'—';
+  const prodProm=activas>0?(totalOS/activas/6).toFixed(1):'—';
 
   document.getElementById('dp-dname').textContent=distShort(d);
   document.getElementById('dp-did').textContent='Tipo '+info.t;
@@ -1152,7 +1154,7 @@ function renderDistDetail(d){
       <div class="kpi-sub">Con ≥1 OS en la semana</div></div>
     <div class="kpi-c"><div class="kpi-label">PRODUCTIVIDAD MEDIA</div>
       <div class="kpi-val dk">${prodProm}</div>
-      <div class="kpi-sub">OS por cuadrilla activa</div></div>
+      <div class="kpi-sub">OS / cuadrilla activa / día</div></div>
     <div class="kpi-c"><div class="kpi-label">TOTAL OS</div>
       <div class="kpi-val dk">${totalOS.toLocaleString()}</div>
       <div class="kpi-sub">Órdenes procesadas semana</div></div>`;
@@ -1192,23 +1194,23 @@ function renderDistDetail(d){
   // OS donut — desglose real por tipo de servicio del distrito
   const tipoCount={};
   tecs.forEach(t=>(t.semOrders||[]).forEach(o=>{tipoCount[o.tipo]=(tipoCount[o.tipo]||0)+1;}));
-  const tipoEntries=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]).slice(0,4);
-  const donutColors=['#E85420','#F0703A','#F89060','#FBBFA7'];
+  const tipoEntries=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]);
   const totalOSFull=tipoEntries.reduce((s,[,n])=>s+n,0)||1;
   document.getElementById('os-total-num').textContent=totalOS.toLocaleString();
   if(chartOsDist)chartOsDist.destroy();
   if(tipoEntries.length){
     chartOsDist=new Chart(document.getElementById('chart-os-dist'),{
       type:'doughnut',
-      data:{labels:tipoEntries.map(([t])=>t),datasets:[{data:tipoEntries.map(([,n])=>n),backgroundColor:donutColors,borderWidth:2,borderColor:'white'}]},
+      data:{labels:tipoEntries.map(([t])=>t),datasets:[{data:tipoEntries.map(([,n])=>n),backgroundColor:tipoEntries.map((_,i)=>SVC_COLORS[i%SVC_COLORS.length]),borderWidth:2,borderColor:'white'}]},
       options:{responsive:true,maintainAspectRatio:true,cutout:'65%',plugins:{legend:{display:false}}}
     });
-    document.getElementById('os-legend').innerHTML=tipoEntries.map(([tipo,cnt],i)=>
-      `<div class="os-leg-i"><div class="os-leg-hdr">
-        <span class="os-leg-name"><span class="os-dot" style="background:${donutColors[i]}"></span>${tipo}</span>
+    document.getElementById('os-legend').innerHTML=tipoEntries.map(([tipo,cnt],i)=>{
+      const color=SVC_COLORS[i%SVC_COLORS.length];
+      return `<div class="os-leg-i"><div class="os-leg-hdr">
+        <span class="os-leg-name"><span class="os-dot" style="background:${color}"></span>${tipo}</span>
         <span class="os-count">${(cnt/totalOSFull*100).toFixed(1)}% (${cnt.toLocaleString()})</span>
-      </div><div class="pb"><div class="pf" style="width:${(cnt/totalOSFull*100).toFixed(0)}%;background:${donutColors[i]}"></div></div></div>`
-    ).join('');
+      </div><div class="pb"><div class="pf" style="width:${(cnt/totalOSFull*100).toFixed(0)}%;background:${color}"></div></div></div>`;
+    }).join('');
   }else{
     document.getElementById('os-legend').innerHTML='<div style="color:var(--text3);font-size:12px">Sin datos de OS</div>';
   }
@@ -1282,7 +1284,7 @@ function renderCoordDetail(coord){
   const total=tecs.length;
   const activas=tecs.filter(t=>t.nOrdenes>0).length;
   const totalOS=tecs.reduce((s,t)=>s+t.nOrdenes,0);
-  const prodProm=activas>0?(totalOS/activas).toFixed(1):'—';
+  const prodProm=activas>0?(totalOS/activas/6).toFixed(1):'—';
   const alcanceMeta=coord.alcanceMeta;
   const tendBono=tecs.reduce((s,t)=>s+t.bonoFinal,0);
   // Asistencia real: promedio de días trabajados / 6 días laborales
@@ -1309,15 +1311,16 @@ function renderCoordDetail(coord){
   // Pirámide — OS reales por tipo de servicio del coordinador
   const tipoCount={};
   tecs.forEach(t=>(t.semOrders||[]).forEach(o=>{tipoCount[o.tipo]=(tipoCount[o.tipo]||0)+1;}));
-  const sortedTipos=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const sortedTipos=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]);
   document.getElementById('coord-vol-total').textContent=`TOTAL OS: ${totalOS.toLocaleString()}`;
   const maxTipo=sortedTipos[0]?sortedTipos[0][1]:1;
-  document.getElementById('coord-pyramid').innerHTML=sortedTipos.length?sortedTipos.map(([ tipo,cnt],i)=>{
+  document.getElementById('coord-pyramid').innerHTML=sortedTipos.length?sortedTipos.map(([tipo,cnt],i)=>{
     const wPct=40+Math.round(cnt/maxTipo*60);
+    const color=SVC_COLORS[i%SVC_COLORS.length];
     return `<div class="py-level" style="justify-content:center">
-      <div class="py-bar" style="width:${wPct}%;background:${OR_SHADES[i]};justify-content:space-between">
+      <div class="py-bar" style="width:${wPct}%;background:${color};justify-content:space-between">
         <span>${tipo} (${cnt.toLocaleString()})</span>
-        <span style="font-size:10px;opacity:.8">${(cnt/totalOS*100).toFixed(0)}%</span>
+        <span style="font-size:10px;opacity:.8">${totalOS>0?(cnt/totalOS*100).toFixed(0):0}%</span>
       </div></div>`;
   }).join(''):'<div style="color:var(--text3);font-size:12px;padding:16px">Sin datos de OS</div>';
 
@@ -1742,23 +1745,31 @@ function processWorkbook(wb,filename){
   // Encontrar todos los índices de un nombre (para duplicados)
   const colAll=name=>headers.reduce((a,h,i)=>h===name?[...a,i]:a,[]);
 
-  // Mapa de columnas exacto para intento.xlsx
+  // Detectar columna de coordinador: probar nombres comunes primero, luego última columna
+  const coordColNames=['Coordinador','Nombre coordinador','Nombre Coordinador','COORDINADOR','Coord','COORD','Nombre del Coordinador'];
+  let coordColIdx=coordColNames.reduce((found,name)=>found!==-1?found:col(name),-1);
+  if(coordColIdx===-1){
+    // Usar la última columna con encabezado como coordinador (según estructura del archivo)
+    for(let i=headers.length-1;i>=0;i--){if(headers[i]){coordColIdx=i;break;}}
+  }
+
+  // Mapa de columnas para intento.xlsx
   // Col 0:Cuenta 1:OS 2:OT 3:Tipo 4:SubTipo 5:Ciudad 6:Distrito(1) 7:Cluster
   // 8:Empresa 9:Tipo Cuadrilla 10:No. FFM 11:Tecnico 12:Auxiliar(1) 13:Auxiliar(2)
   // 14:Fecha Termino 15:Estatus 16:Estado 17:Usuario para pago
-  // 18:TIPO DE CUADRILLA 19:PUNTOS 20:Servicio 21:Distrito(2=CTA-TPI-INT)
+  // 18:TIPO DE CUADRILLA 19:PUNTOS 20:Servicio 21:última col=Coordinador
   const distCols=colAll('Distrito');
   const C={
     nombre:  col('Tecnico'),
     ffm:     col('No. FFM')!==-1?col('No. FFM'):col('Usuario para pago'),
     dist1:   distCols.length>1?distCols[1]:distCols[0], // 2nd Distrito = CTA-TPI-INT-*
     skill:   col('TIPO DE CUADRILLA'),       // clasificación de pago
-    puntos:  col('PUNTOS'),                  // ya calculados
     fecha:   col('Fecha Termino'),
     os:      col('OS'),
     ot:      col('OT'),
     tipo:    col('Tipo'),
     servicio:col('Servicio'),
+    coord:   coordColIdx,                    // última columna = coordinador
   };
 
   const clean=v=>(v||'').toString().replace(/[\n\t\r]+/g,' ').replace(/\s+/g,' ').trim();
@@ -1787,8 +1798,13 @@ function processWorkbook(wb,filename){
     const wk    =weekKey(fecha);
     const dia   =fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0')+'-'+String(fecha.getDate()).padStart(2,'0');
 
-    if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,orders:[]};
+    const coordRaw=clean(C.coord>=0?row[C.coord]||'':'');
+    // Mostrar coordinador: si viene en formato CTA-TPI-INT-*, quitar prefijo
+    const coordNom=coordRaw.startsWith('CTA-TPI-INT-')?coordRaw.replace('CTA-TPI-INT-',''):coordRaw;
+
+    if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[]};
     if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
+    if(coordNom&&!techMap[techKey].coord)techMap[techKey].coord=coordNom;
 
     // Guardamos tipo (no puntos) → los puntos se calculan en rebuildFromRawOrders con SERVICIOS actuales
     techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
@@ -1887,9 +1903,10 @@ function rebuildFromRawOrders(){
     });
     while(histAll.length<10)histAll.unshift(0);histAll.splice(10);
 
-    // Coordinador = uno por distrito
-    const cid='COORD-'+tech.dist.replace(/[^a-z0-9]/gi,'_');
-    if(!newCoords[cid])newCoords[cid]={id:cid,nombre:'Coord. '+distShort(tech.dist),
+    // Coordinador: usar nombre real del archivo (última columna), fallback a distrito
+    const coordDisplay=tech.coord||distShort(tech.dist);
+    const cid='COORD-'+coordDisplay.replace(/[^a-z0-9]/gi,'_');
+    if(!newCoords[cid])newCoords[cid]={id:cid,nombre:coordDisplay,
       distrito:tech.dist,tecnicosIds:[],ordenesSem:0,alcanceMeta:0,_sumPct:0,_n:0};
     const tecId='TEC-R-'+tech.ffm;
     if(!newCoords[cid].tecnicosIds.includes(tecId))newCoords[cid].tecnicosIds.push(tecId);
