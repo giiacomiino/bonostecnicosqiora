@@ -429,12 +429,37 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       </div>
 
       <!-- Bono Total por Distrito -->
-      <div class="cc">
+      <div class="cc mb">
         <div class="cc-head">
           <div><div class="cc-title">Bono Total por Distrito</div><div class="cc-sub">Haz clic en un distrito para ver su detalle completo</div></div>
           <span class="chip chip-or">BONO TOTAL</span>
         </div>
         <div style="height:300px"><canvas id="chart-bono-dist"></canvas></div>
+      </div>
+
+      <!-- Análisis de Penalizaciones Nacional -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-top:6px;border-top:2px solid var(--red-l)">
+        <svg width="16" height="16" fill="none" stroke="var(--red)" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span style="font-size:14px;font-weight:700;color:var(--text)">Análisis de Penalizaciones por Inasistencias</span>
+        <div id="pen-nacional-summary" style="margin-left:auto;display:flex;gap:18px"></div>
+      </div>
+      <div class="g2 mb">
+        <!-- Penalizaciones por Distrito -->
+        <div class="cc">
+          <div class="cc-head">
+            <div><div class="cc-title">Descuento por Distrito</div><div class="cc-sub">Monto total deducido por inasistencias · período actual</div></div>
+            <span class="chip" style="background:var(--red-l);color:var(--red)">DESCUENTOS $</span>
+          </div>
+          <div style="height:260px"><canvas id="chart-pen-dist"></canvas></div>
+        </div>
+        <!-- Distribución de inasistencias -->
+        <div class="cc">
+          <div class="cc-head">
+            <div><div class="cc-title">Distribución de Inasistencias</div><div class="cc-sub">Cuadrillas activas agrupadas por días de ausencia</div></div>
+            <span class="chip chip-gy">NACIONAL</span>
+          </div>
+          <div id="ina-dist-wrap"></div>
+        </div>
       </div>
 
     </div><!-- /nacional -->
@@ -497,6 +522,24 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
                   <thead><tr><th>#</th><th>Coordinador</th><th>Órdenes/Sem</th><th>Prod. Prom</th></tr></thead>
                   <tbody id="tbody-coords"></tbody>
                 </table>
+              </div>
+            </div>
+
+            <!-- Penalizaciones del Distrito -->
+            <div class="g2 mb">
+              <div class="cc">
+                <div class="cc-head">
+                  <div><div class="cc-title">Inasistencias: Distribución del Equipo</div><div class="cc-sub">Técnicos agrupados por días de ausencia</div></div>
+                  <div id="dist-pen-summary" style="font-size:11px;color:var(--red);font-weight:700"></div>
+                </div>
+                <div style="height:180px"><canvas id="chart-dist-ina"></canvas></div>
+              </div>
+              <div class="cc">
+                <div class="cc-head">
+                  <div><div class="cc-title">Técnicos con Mayor Descuento</div><div class="cc-sub">Ordenados por monto deducido</div></div>
+                  <span class="chip" style="background:var(--red-l);color:var(--red)">TOP PENALIZADOS</span>
+                </div>
+                <div id="top-penalizados"></div>
               </div>
             </div>
 
@@ -636,6 +679,9 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
             </div>
           </div>
         </div>
+
+        <!-- Penalizaciones del equipo -->
+        <div class="cc mb" id="coord-pen-section"></div>
 
         <!-- Tendencia del equipo -->
         <div class="cc mb">
@@ -1141,6 +1187,7 @@ let distSearch='', distType='';
 let coordSearch='', coordDist='';
 let chartTrend=null, chartTrendVol=null, chartCascade=null, chartOsDist=null, chartHistorico=null, chartFunnelOS=null;
 let chartDistOverview=null, chartDistTrend=null, chartCoordOverview=null, chartCoordTrend=null, chartTecOS=null;
+let chartPenDist=null, chartDistIna=null;
 
 // ── Ordenamiento de tablas ────────────────────────────────────────────────────
 const _sort={tec:{col:'pct',dir:-1}, coord:{col:'alcanceMeta',dir:-1}, calc:{col:'pct',dir:-1}, coordTecs:{col:'pct',dir:-1}};
@@ -1541,6 +1588,79 @@ function renderNacional(){
   </tr></tbody></table>`;
   document.getElementById('sens-table-wrap').innerHTML=sensHtml;
 
+  // ── Penalizaciones Nacional ──────────────────────────────────────────────
+  const totalDesc=fd.reduce((s,t)=>s+t.descuento,0);
+  const conIna=fd.filter(t=>t.inas>0&&t.nOrdenes>0).length;
+  const pctIna=fdActivas.length>0?(conIna/fdActivas.length*100).toFixed(1):'0';
+  document.getElementById('pen-nacional-summary').innerHTML=`
+    <div style="text-align:center">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Total Descontado</div>
+      <div style="font-size:16px;font-weight:700;color:var(--red)">${f$(totalDesc)}</div></div>
+    <div style="text-align:center">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Cuadrillas con Falta</div>
+      <div style="font-size:16px;font-weight:700;color:var(--red)">${conIna}</div></div>
+    <div style="text-align:center">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">% Afectadas</div>
+      <div style="font-size:16px;font-weight:700;color:var(--red)">${pctIna}%</div></div>`;
+
+  // Descuento por distrito — horizontal bar
+  const distDesc={};
+  fd.forEach(t=>{distDesc[t.distrito]=(distDesc[t.distrito]||0)+t.descuento;});
+  const sdDesc=Object.entries(distDesc).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  if(chartPenDist)chartPenDist.destroy();
+  if(sdDesc.length){
+    chartPenDist=new Chart(document.getElementById('chart-pen-dist'),{
+      type:'bar',
+      data:{labels:sdDesc.map(([d])=>distShort(d)),datasets:[{
+        label:'Descuento $',data:sdDesc.map(([,v])=>v),
+        backgroundColor:'rgba(239,68,68,.75)',borderRadius:4,borderSkipped:false
+      }]},
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(c.parsed.x)}}},
+        scales:{
+          x:{ticks:{callback:v=>fk(v),font:{size:10}},grid:{color:'#F3F4F6'}},
+          y:{ticks:{font:{size:10}},grid:{display:false}}
+        }
+      }
+    });
+  } else {
+    document.getElementById('chart-pen-dist').parentElement.innerHTML='<div style="color:var(--text3);font-size:12px;padding:24px;text-align:center">Sin penalizaciones en este período</div>';
+  }
+
+  // Distribución de inasistencias: 0 / 1 / 2 / 3+ días
+  const inaBuckets=[
+    {label:'0 días (sin falta)',min:0,max:1,bg:'#DCFCE7',tc:'#16A34A'},
+    {label:'1 día',            min:1,max:2,bg:'#FEF3C7',tc:'#D97706'},
+    {label:'2 días',           min:2,max:3,bg:'#FEE2E2',tc:'#DC2626'},
+    {label:'3+ días',          min:3,max:99,bg:'#FEE2E2',tc:'#991B1B'}
+  ];
+  let inaHtml=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#FAFAFA">
+      <th style="padding:7px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Ausencias</th>
+      <th style="padding:7px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Cuadrillas</th>
+      <th style="padding:7px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">% del total</th>
+      <th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Descuento</th>
+    </tr></thead><tbody>`;
+  inaBuckets.forEach(b=>{
+    const grp=fd.filter(t=>t.inas>=b.min&&t.inas<b.max);
+    const cnt=grp.length;
+    const pctT=fd.length>0?(cnt/fd.length*100).toFixed(1):'0';
+    const desc=grp.reduce((s,t)=>s+t.descuento,0);
+    inaHtml+=`<tr style="border-bottom:1px solid #F5F5F8">
+      <td style="padding:8px 10px"><span style="background:${b.bg};color:${b.tc};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">${b.label}</span></td>
+      <td style="padding:8px 10px;text-align:center;font-weight:700">${cnt}</td>
+      <td style="padding:8px 10px;text-align:center">
+        <div style="display:flex;align-items:center;gap:5px;justify-content:center">
+          <div style="width:40px;height:4px;background:#F0F0F5;border-radius:2px;overflow:hidden"><div style="width:${pctT}%;height:100%;background:${b.tc};border-radius:2px"></div></div>
+          <span style="font-size:11px;font-weight:600;color:${b.tc}">${pctT}%</span>
+        </div>
+      </td>
+      <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--red)">${desc>0?f$(desc):'—'}</td>
+    </tr>`;
+  });
+  inaHtml+=`</tbody></table>`;
+  document.getElementById('ina-dist-wrap').innerHTML=inaHtml;
 
   // Bono por distrito — solo datos reales, sin presupuesto inventado
   const distBonos={};
@@ -1752,6 +1872,61 @@ function renderDistDetail(d){
     :pctF>=80?`${distShort(d)} se encuentra al ${avgPct}% de su meta semanal.`
     :`${distShort(d)} está ${(100-pctF).toFixed(1)}% por debajo de la meta.`;
 
+  // ── Penalizaciones del distrito ───────────────────────────────────────────
+  const dTotalDesc=tecs.reduce((s,t)=>s+t.descuento,0);
+  const dConIna=tecs.filter(t=>t.inas>0).length;
+  const dPctIna=tecs.length>0?(dConIna/tecs.length*100).toFixed(1):'0';
+  document.getElementById('dist-pen-summary').textContent=
+    dConIna>0?`${dConIna} cuadrilla(s) penalizadas · ${f$(dTotalDesc)} descontado`:'Sin penalizaciones';
+
+  // Gráfica: técnicos agrupados por días de ausencia
+  const dBuckets=[
+    {label:'0 días',min:0,max:1,color:'#16A34A'},
+    {label:'1 día',min:1,max:2,color:'#D97706'},
+    {label:'2 días',min:2,max:3,color:'#DC2626'},
+    {label:'3+ días',min:3,max:99,color:'#991B1B'}
+  ];
+  if(chartDistIna)chartDistIna.destroy();
+  chartDistIna=new Chart(document.getElementById('chart-dist-ina'),{
+    type:'bar',
+    data:{
+      labels:dBuckets.map(b=>b.label),
+      datasets:[{
+        label:'Cuadrillas',
+        data:dBuckets.map(b=>tecs.filter(t=>t.inas>=b.min&&t.inas<b.max).length),
+        backgroundColor:dBuckets.map(b=>b.color+'BB'),
+        borderRadius:4,borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} cuadrilla(s)`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:11}}},
+        y:{ticks:{stepSize:1,font:{size:10}},grid:{color:'#F3F4F6'}}
+      }
+    }
+  });
+
+  // Top 5 penalizados
+  const top5pen=tecs.filter(t=>t.descuento>0).sort((a,b)=>b.descuento-a.descuento).slice(0,5);
+  document.getElementById('top-penalizados').innerHTML=top5pen.length
+    ?`<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#FAFAFA">
+        <th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">#</th>
+        <th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">Técnico</th>
+        <th style="padding:6px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">Inasist.</th>
+        <th style="padding:6px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">Descuento</th>
+      </tr></thead><tbody>
+      ${top5pen.map((t,i)=>`<tr style="border-bottom:1px solid #F5F5F8" onclick="openTecFicha('${t.id}')">
+        <td style="padding:7px 10px"><span class="rk ${i===0?'rk1':i===1?'rk2':i===2?'rk3':''}">${i+1}</span></td>
+        <td style="padding:7px 10px;font-weight:500">${t.nombre}</td>
+        <td style="padding:7px 10px;text-align:center;color:var(--red);font-weight:700">${t.inas}</td>
+        <td style="padding:7px 10px;text-align:right;font-weight:700;color:var(--red)">−${f$(t.descuento)}</td>
+      </tr>`).join('')}
+      </tbody></table>`
+    :'<div style="color:var(--text3);font-size:12px;padding:16px;text-align:center">Sin penalizaciones en este período</div>';
+
   // ── Top 10 técnicos del distrito ──────────────────────────────────────────
   const sortCrit=(document.getElementById('top-tec-sort')||{}).value||'pct';
   const colLabels={pct:'% Alcance',nOrdenes:'OS',dias:'Días',bonoFinal:'Bono Final',estrellas:'⭐ Estrellas'};
@@ -1961,6 +2136,64 @@ function renderCoordDetail(coord){
       <div class="meta-hdr"><span class="meta-name">Técnicos con bono completo (100%+)</span><span class="meta-pct" style="color:var(--or)">${tecs.filter(t=>t.pct>=100).length} / ${total}</span></div>
       <div class="pb-lg"><div class="pf" style="width:${total>0?Math.round(tecs.filter(t=>t.pct>=100).length/total*100):0}%;background:var(--or)"></div></div>
     </div>`;
+
+  // ── Penalizaciones del equipo ─────────────────────────────────────────────
+  const cTotalDesc=tecs.reduce((s,t)=>s+t.descuento,0);
+  const cConIna=tecs.filter(t=>t.inas>0).length;
+  const cPctIna=tecs.length>0?(cConIna/tecs.length*100).toFixed(1):'0';
+  const cPenTecs=tecs.filter(t=>t.descuento>0).sort((a,b)=>b.descuento-a.descuento);
+  const cPenBuckets=[
+    {label:'0 días',min:0,max:1,bg:'#DCFCE7',tc:'#16A34A'},
+    {label:'1 día',  min:1,max:2,bg:'#FEF3C7',tc:'#D97706'},
+    {label:'2 días', min:2,max:3,bg:'#FEE2E2',tc:'#DC2626'},
+    {label:'3+ días',min:3,max:99,bg:'#FEE2E2',tc:'#991B1B'}
+  ];
+  const penSecEl=document.getElementById('coord-pen-section');
+  if(penSecEl){
+    penSecEl.innerHTML=`
+      <div class="cc-head" style="margin-bottom:14px">
+        <div>
+          <div class="cc-title">Penalizaciones del Equipo</div>
+          <div class="cc-sub">Inasistencias e impacto en bono</div>
+        </div>
+        ${cConIna>0
+          ?`<div style="display:flex;gap:14px">
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Total Descontado</div>
+                <div style="font-size:15px;font-weight:700;color:var(--red)">${f$(cTotalDesc)}</div></div>
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">Afectados</div>
+                <div style="font-size:15px;font-weight:700;color:var(--red)">${cConIna} / ${total}</div></div>
+              <div style="text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px">% equipo</div>
+                <div style="font-size:15px;font-weight:700;color:var(--red)">${cPctIna}%</div></div>
+            </div>`
+          :'<span style="font-size:12px;font-weight:600;color:var(--green)">Sin penalizaciones este período ✓</span>'}
+      </div>
+      ${cConIna>0?`
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        ${cPenBuckets.map(b=>{
+          const cnt=tecs.filter(t=>t.inas>=b.min&&t.inas<b.max).length;
+          return `<div style="flex:1;min-width:70px;background:${b.bg};border-radius:8px;padding:10px 12px;text-align:center">
+            <div style="font-size:11px;font-weight:700;color:${b.tc}">${b.label}</div>
+            <div style="font-size:20px;font-weight:800;color:${b.tc};margin:2px 0">${cnt}</div>
+            <div style="font-size:10px;color:${b.tc};opacity:.8">${tecs.length>0?(cnt/tecs.length*100).toFixed(0):0}%</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:#FAFAFA">
+          <th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">Técnico</th>
+          <th style="padding:6px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">Inasist.</th>
+          <th style="padding:6px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">Descuento</th>
+          <th style="padding:6px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border)">Bono Final</th>
+        </tr></thead><tbody>
+        ${cPenTecs.map(t=>`<tr style="border-bottom:1px solid #F5F5F8" onclick="openTecFicha('${t.id}')">
+          <td style="padding:7px 10px;font-weight:500">${t.nombre}</td>
+          <td style="padding:7px 10px;text-align:center;color:var(--red);font-weight:700">${t.inas}</td>
+          <td style="padding:7px 10px;text-align:right;color:var(--red);font-weight:600">−${f$(t.descuento)}</td>
+          <td style="padding:7px 10px;text-align:right;font-weight:700;color:${t.bonoFinal>0?'var(--green)':'var(--text3)'}">${f$(t.bonoFinal)}</td>
+        </tr>`).join('')}
+        </tbody></table>`:
+      ''}`;
+  }
 
   // Tendencia del equipo: bonos semanales del coordinador
   if(window._allRealData&&window._realWeeks){
