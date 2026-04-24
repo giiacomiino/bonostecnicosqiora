@@ -819,16 +819,19 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
           <div style="font-size:18px;font-weight:700;color:var(--text)">Ajustes del Sistema</div>
           <div style="font-size:12px;color:var(--text3);margin-top:2px">Edita metas, montos de bono y ponderación de servicios. Los cambios aplican de inmediato al recalcular.</div>
         </div>
-        <button onclick="saveConfig()" style="background:var(--or);color:white;border:none;border-radius:8px;padding:10px 20px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <button id="cfg-save-btn" onclick="saveConfig()" style="background:var(--or);color:white;border:none;border-radius:8px;padding:10px 20px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
           <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          Guardar y Recalcular
+          Guardar en Supabase
         </button>
       </div>
 
       <div class="tc mb" style="margin-bottom:20px">
         <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
           <div style="font-size:13px;font-weight:700">Metas por Distrito y Tipo de Cuadrilla</div>
-          <div style="font-size:11px;color:var(--text3)">Valores en estrellas (⭐) semanales por skill</div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="font-size:11px;color:var(--text3)">Valores en estrellas (⭐) semanales por skill</div>
+            <span id="cfg-vigencia" style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:10px;font-weight:600"></span>
+          </div>
         </div>
         <div style="overflow-x:auto">
         <table>
@@ -861,6 +864,13 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
                   <td><input class="cfg-num" id="bonoB80" type="number" value="450" min="0"/></td>
                   <td><input class="cfg-num" id="bonoB90" type="number" value="800" min="0"/></td>
                   <td><input class="cfg-num" id="bonoB100" type="number" value="1800" min="0"/></td>
+                  <td style="font-size:12px;color:var(--text2)">+$100/6⭐ (máx $500)</td>
+                </tr>
+                <tr>
+                  <td><span style="background:#FEF3C7;color:#92400E;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px">Tipo C</span></td>
+                  <td><input class="cfg-num" id="bonoC80" type="number" value="300" min="0"/></td>
+                  <td><input class="cfg-num" id="bonoC90" type="number" value="700" min="0"/></td>
+                  <td><input class="cfg-num" id="bonoC100" type="number" value="1400" min="0"/></td>
                   <td style="font-size:12px;color:var(--text2)">+$100/6⭐ (máx $500)</td>
                 </tr>
               </tbody>
@@ -1046,6 +1056,9 @@ async function loadFromSupabase(){
     document.getElementById('period-type').value='sem';
     monthSel.style.display='none'; weekSel.style.display=''; window._periodWeeks=1;
 
+    // Cargar config de Supabase antes de recalcular
+    setSbStatus('Cargando configuración…',null);
+    await loadConfig();
     rebuildFromRawOrders();
     const nT=Object.keys(techMap).length;
     const slEl=document.getElementById('source-label');
@@ -1060,6 +1073,132 @@ async function loadFromSupabase(){
       :'Error: '+err.message;
     setSbStatus(msg,false);
     console.error('Supabase load error:',err);
+  }
+}
+
+// ═══════════════════════════════════════════
+// CARGA DE CONFIGURACIÓN DESDE SUPABASE
+// Lee config_distritos, config_bonos_base, config_servicios
+// y reconstruye METAS, BONOS, SERVICIOS, DESC_D en memoria.
+// Registros vigentes = fecha_fin IS NULL.
+// ═══════════════════════════════════════════
+async function loadConfig(){
+  try{
+    const today=new Date().toISOString().slice(0,10);
+    const [dr,br,sr]=await Promise.all([
+      _sb.from('config_distritos').select('*').lte('fecha_inicio',today).or('fecha_fin.is.null,fecha_fin.gte.'+today).order('fecha_inicio',{ascending:false}),
+      _sb.from('config_bonos_base').select('*').lte('fecha_inicio',today).or('fecha_fin.is.null,fecha_fin.gte.'+today).order('fecha_inicio',{ascending:false}),
+      _sb.from('config_servicios').select('*').lte('fecha_inicio',today).or('fecha_fin.is.null,fecha_fin.gte.'+today).order('fecha_inicio',{ascending:false}),
+    ]);
+    if(dr.error||br.error||sr.error){console.warn('loadConfig error parcial',dr.error||br.error||sr.error);return false;}
+
+    // Reconstruir METAS + DESC_D (tomar el registro más reciente por distrito)
+    const seenD=new Set();
+    DESC_D.clear();
+    dr.data.forEach(row=>{
+      if(seenD.has(row.distrito))return;
+      seenD.add(row.distrito);
+      METAS[row.distrito]={t:row.tipo,N:row.meta_normal,Mo:row.meta_moto,H:row.meta_hibrida,E:row.meta_elite,Mu:row.meta_multidistrito};
+      if(row.penalizacion)DESC_D.add(row.distrito);
+    });
+
+    // Reconstruir BONOS (tomar más reciente por tipo+tramo)
+    const seenB=new Set();
+    br.data.forEach(row=>{
+      const key=row.tipo_distrito+'_'+row.pct_min;
+      if(seenB.has(key))return;
+      seenB.add(key);
+      if(!BONOS[row.tipo_distrito])BONOS[row.tipo_distrito]={};
+      const bracket=row.pct_min<90?'80':row.pct_min<100?'90':'100';
+      BONOS[row.tipo_distrito][bracket]=row.monto;
+    });
+
+    // Reconstruir SERVICIOS (tomar más reciente por tipo)
+    const seenS=new Set();
+    const newSvc=[];
+    sr.data.forEach(row=>{
+      if(seenS.has(row.tipo))return;
+      seenS.add(row.tipo);
+      newSvc.push([row.tipo,row.puntos]);
+    });
+    if(newSvc.length){SERVICIOS.length=0;newSvc.forEach(s=>SERVICIOS.push(s));}
+
+    // Guardar registros vigentes para la UI de Ajustes
+    window._cfgDistritos=dr.data.filter(r=>!r.fecha_fin);
+    window._cfgBonos    =br.data.filter(r=>!r.fecha_fin);
+    window._cfgSvc      =sr.data.filter(r=>!r.fecha_fin);
+    return true;
+  }catch(e){
+    console.warn('loadConfig exception:',e);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// GUARDAR CONFIGURACIÓN A SUPABASE (versionado)
+// Cierra registros vigentes (fecha_fin = ayer)
+// e inserta nuevos con fecha_inicio = hoy.
+// ═══════════════════════════════════════════
+async function persistConfigToSupabase(){
+  const today=new Date().toISOString().slice(0,10);
+  const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const btn=document.getElementById('cfg-save-btn');
+  const msg=document.getElementById('cfg-saved-msg');
+  if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+  try{
+    // ── Distritos ──────────────────────────────────
+    const newDist=Object.entries(METAS).map(([d,info])=>({
+      distrito:d, tipo:info.t,
+      penalizacion:DESC_D.has(d),
+      meta_normal:info.N, meta_moto:info.Mo, meta_hibrida:info.H,
+      meta_elite:info.E, meta_multidistrito:info.Mu,
+      fecha_inicio:today, fecha_fin:null
+    }));
+    if(window._cfgDistritos?.length){
+      const {error:e1}=await _sb.from('config_distritos').update({fecha_fin:yesterday}).is('fecha_fin',null);
+      if(e1)throw e1;
+    }
+    const {error:e2}=await _sb.from('config_distritos').insert(newDist);
+    if(e2)throw e2;
+
+    // ── Bonos base ────────────────────────────────
+    const newBonos=[];
+    Object.entries(BONOS).forEach(([tipo,tiers])=>{
+      [{min:80,max:90,k:'80'},{min:90,max:100,k:'90'},{min:100,max:999,k:'100'}].forEach(({min,max,k})=>{
+        if(tiers[k]!==undefined)newBonos.push({tipo_distrito:tipo,pct_min:min,pct_max:max,monto:tiers[k],fecha_inicio:today,fecha_fin:null});
+      });
+    });
+    if(window._cfgBonos?.length){
+      const {error:e3}=await _sb.from('config_bonos_base').update({fecha_fin:yesterday}).is('fecha_fin',null);
+      if(e3)throw e3;
+    }
+    const {error:e4}=await _sb.from('config_bonos_base').insert(newBonos);
+    if(e4)throw e4;
+
+    // ── Servicios ────────────────────────────────
+    const newSvc=SERVICIOS.map(([tipo,puntos])=>({tipo,puntos,fecha_inicio:today,fecha_fin:null}));
+    if(window._cfgSvc?.length){
+      const {error:e5}=await _sb.from('config_servicios').update({fecha_fin:yesterday}).is('fecha_fin',null);
+      if(e5)throw e5;
+    }
+    const {error:e6}=await _sb.from('config_servicios').insert(newSvc);
+    if(e6)throw e6;
+
+    // Recargar config vigente y recalcular
+    await loadConfig();
+    if(window._techMap)rebuildFromRawOrders();
+    renderAll();
+    renderConfig();
+    if(msg){msg.style.display='block';msg.style.background='var(--green-l)';msg.style.color='var(--green)';
+      msg.innerHTML=`✓ Configuración guardada en Supabase — vigente desde hoy (${today})`;
+      setTimeout(()=>msg.style.display='none',4000);}
+  }catch(err){
+    console.error('persistConfig error:',err);
+    if(msg){msg.style.display='block';msg.style.background='#FEE2E2';msg.style.color='#DC2626';
+      msg.textContent='Error al guardar: '+err.message;
+      setTimeout(()=>msg.style.display='none',5000);}
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML='<svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Guardar en Supabase';}
   }
 }
 
@@ -2773,6 +2912,13 @@ function renderCalculo(){
 // CONFIG
 // ═══════════════════════════════════════════
 function renderConfig(){
+  // Badge de vigencia (fecha del registro activo más reciente)
+  const vigEl=document.getElementById('cfg-vigencia');
+  if(vigEl){
+    const fi=window._cfgDistritos?.[0]?.fecha_inicio;
+    vigEl.textContent=fi?`Vigente desde: ${fi}`:'Valores por defecto (sin Supabase)';
+  }
+
   document.getElementById('tbody-config').innerHTML=Object.entries(METAS).map(([d,info])=>{
     const hasDesc=DESC_D.has(d);
     const tid=d.replace(/[^a-z0-9]/gi,'_');
@@ -2782,6 +2928,7 @@ function renderConfig(){
         <select class="cfg-sel" id="tipo_${tid}" onchange="updateMetaTipo('${d}',this.value)">
           <option value="A"${info.t==='A'?' selected':''}>Tipo A</option>
           <option value="B"${info.t==='B'?' selected':''}>Tipo B</option>
+          <option value="C"${info.t==='C'?' selected':''}>Tipo C</option>
         </select>
       </td>
       <td><input class="cfg-num" id="N_${tid}" type="number" value="${info.N}" min="0"/></td>
@@ -2797,47 +2944,44 @@ function renderConfig(){
       </td>
     </tr>`;
   }).join('');
+
   document.getElementById('tbody-servicios').innerHTML=SERVICIOS.map(([s,p],i)=>`
     <tr><td style="font-size:12px">${s}</td><td style="text-align:center"><input class="cfg-num" id="svc_${i}" type="number" value="${p}" min="0" style="width:56px"/></td></tr>`).join('');
-  // sync bono inputs
-  document.getElementById('bonoA80').value=BONOS.A['80'];
-  document.getElementById('bonoA90').value=BONOS.A['90'];
-  document.getElementById('bonoA100').value=BONOS.A['100'];
-  document.getElementById('bonoB80').value=BONOS.B['80'];
-  document.getElementById('bonoB90').value=BONOS.B['90'];
-  document.getElementById('bonoB100').value=BONOS.B['100'];
+
+  // Sync bono inputs desde BONOS en memoria
+  ['A','B','C'].forEach(t=>{
+    if(!BONOS[t])return;
+    ['80','90','100'].forEach(k=>{
+      const el=document.getElementById('bono'+t+k);
+      if(el&&BONOS[t][k]!==undefined)el.value=BONOS[t][k];
+    });
+  });
 }
 
 function updateMetaTipo(dist,val){METAS[dist].t=val;}
 function updateDescD(dist,checked){if(checked)DESC_D.add(dist);else DESC_D.delete(dist);}
 
 function saveConfig(){
-  // Leer metas por distrito
+  // 1. Leer DOM → actualizar METAS, BONOS, SERVICIOS en memoria
   Object.entries(METAS).forEach(([d,info])=>{
     const tid=d.replace(/[^a-z0-9]/gi,'_');
     const gv=id=>{const el=document.getElementById(id);return el?parseInt(el.value)||0:null;};
     if(gv('N_'+tid)!==null){info.N=gv('N_'+tid);info.Mo=gv('Mo_'+tid);info.H=gv('H_'+tid);info.E=gv('E_'+tid);info.Mu=gv('Mu_'+tid);}
   });
-  // Leer montos de bono
-  BONOS.A['80']=parseInt(document.getElementById('bonoA80').value)||500;
-  BONOS.A['90']=parseInt(document.getElementById('bonoA90').value)||900;
-  BONOS.A['100']=parseInt(document.getElementById('bonoA100').value)||2500;
-  BONOS.B['80']=parseInt(document.getElementById('bonoB80').value)||450;
-  BONOS.B['90']=parseInt(document.getElementById('bonoB90').value)||800;
-  BONOS.B['100']=parseInt(document.getElementById('bonoB100').value)||1800;
-  // Leer ponderaciones de servicio
+  ['A','B','C'].forEach(t=>{
+    if(!BONOS[t])BONOS[t]={};
+    const g=id=>{const el=document.getElementById('bono'+t+id);return el?parseInt(el.value)||0:null;};
+    if(g('80')!==null){BONOS[t]['80']=g('80');BONOS[t]['90']=g('90');BONOS[t]['100']=g('100');}
+  });
   SERVICIOS.forEach((_,i)=>{const el=document.getElementById('svc_'+i);if(el)SERVICIOS[i][1]=parseInt(el.value)||0;});
 
-  if(window._techMap){
-    // Datos reales: recalcular desde órdenes crudas con nuevos ajustes
-    rebuildFromRawOrders();
-  }else{
-    // Datos mock: recalcular bonos con nueva config de metas y bonos
+  // 2. Recalcular localmente para feedback inmediato
+  if(window._techMap){rebuildFromRawOrders();}
+  else{
     allData.forEach(t=>{
       const info=METAS[t.distrito]||{t:'B'};
       const sk=SK_KEY[t.skill]||'N';
-      t.meta=info[sk]||info.N||84;
-      t.tipo=info.t;
+      t.meta=info[sk]||info.N||84; t.tipo=info.t;
       t.pct=t.meta>0?Math.round(t.estrellas/t.meta*100):0;
       t.bonoBase=bonoBase(t.pct,t.tipo);
       t.bono110=bono110(t.pct,t.estrellas,t.meta,t.tipo);
@@ -2846,9 +2990,9 @@ function saveConfig(){
     });
   }
   renderAll();
-  const msg=document.getElementById('cfg-saved-msg');
-  msg.style.display='block';
-  setTimeout(()=>msg.style.display='none',3000);
+
+  // 3. Persistir en Supabase (versionado con fecha_inicio/fin)
+  persistConfigToSupabase();
 }
 
 // Renderiza la vista activa + nacional (se llama tras cambiar semana o config)
