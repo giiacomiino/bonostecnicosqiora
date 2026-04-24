@@ -99,8 +99,11 @@ SistemaBonos/
 ### Descuentos por inasistencia
 
 - Aplica solo en algunos distritos (7 distritos con penalización, resto = 0%)
-- 1 inasistencia = 50% del bono total
-- 2+ inasistencias = 100% del bono total (pierde todo el bono)
+- El técnico tiene derecho a 1 día de descanso por semana (cualquier día, no fijo)
+- `faltas = max(0, días_con_OS - 6)` — ya descuenta el 1 día de descanso
+- **2 faltas → 50% del bono total**
+- **3+ faltas → 100% del bono total (pierde todo)**
+- 0-1 faltas → sin descuento
 - El descuento se aplica sobre (Bono Base + Bono Extra)
 
 ### Regla de asistencia semanal
@@ -200,6 +203,7 @@ App web de una sola página (SPA). Sin framework — HTML/CSS/JS puro.
 | 17-abr-2026 | Bono extra Tipo B/C | Trigger en 100% (no 110%); estrellas extra desde meta base, no desde umbral 110% |
 | 17-abr-2026 | Bono extra Tipo A | $500 fijo si alcanza ≥110% de meta — nada más, sin escala por estrellas |
 | 17-abr-2026 | Asistencia semanal | Descanso no es fijo en domingo; 1 día libre por semana (cualquier día); días extra sin OS = falta |
+| 24-abr-2026 | Descuento por inasistencia | Umbral cambiado: descuento inicia en 2 faltas (50%), no en 1; 3+ faltas = 100%; 0-1 faltas = sin descuento |
 
 ---
 

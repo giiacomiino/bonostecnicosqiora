@@ -1247,8 +1247,11 @@ function bono110(pct,est,meta,t){
   return Math.min(Math.floor(Math.max(0,est-meta)/6)*100, 500);
 }
 function descuento(dist,inas,base,b110){
-  if(!DESC_D.has(dist)||inas===0)return 0;
-  if(inas===1)return Math.round((base+b110)*0.5);
+  // Descuento aplica solo en distritos con penalización
+  // El técnico tiene derecho a 1 día de descanso/semana (ya descontado en inas)
+  // Umbral: 2 faltas → 50%  |  3+ faltas → 100%
+  if(!DESC_D.has(dist)||inas<2)return 0;
+  if(inas===2)return Math.round((base+b110)*0.5);
   return base+b110;
 }
 
@@ -2667,7 +2670,7 @@ function renderFicha(t){
     <div class="des-row"><span class="des-key">Tipo de distrito</span><span class="des-val">Tipo ${t.tipo}</span></div>
     <div class="des-row"><span class="des-key">Bono base (${fp(t.pct)} de meta)</span><span class="des-val">${t.bonoBase>0?f$(t.bonoBase):'$0 (no alcanzó 80%)'}</span></div>
     <div class="des-row"><span class="des-key">Bono 110%+ extra</span><span class="des-val" style="color:var(--green)">${t.bono110>0?'+'+f$(t.bono110):'—'}</span></div>
-    <div class="des-row"><span class="des-key">Descuento por ${t.inas} inasistencia(s) ${t.descuento>0?'('+( t.inas===1?'50':'100')+'% del bono)':''}</span><span class="des-val" style="color:var(--red)">${t.descuento>0?'−'+f$(t.descuento):'—'}</span></div>
+    <div class="des-row"><span class="des-key">Descuento por ${t.inas} inasistencia(s) ${t.descuento>0?'('+(t.inas===2?'50':'100')+'% del bono)':''}</span><span class="des-val" style="color:var(--red)">${t.descuento>0?'−'+f$(t.descuento):'—'}</span></div>
     <div class="des-row des-total"><span class="des-key">Bono Neto Final</span><span class="des-val">${f$(t.bonoFinal)}</span></div>`;
 }
 
