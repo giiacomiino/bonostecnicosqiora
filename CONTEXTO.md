@@ -203,7 +203,7 @@ App web de una sola página (SPA). Sin framework — HTML/CSS/JS puro.
 | 17-abr-2026 | Bono extra Tipo B/C | Trigger en 100% (no 110%); estrellas extra desde meta base, no desde umbral 110% |
 | 17-abr-2026 | Bono extra Tipo A | $500 fijo si alcanza ≥110% de meta — nada más, sin escala por estrellas |
 | 17-abr-2026 | Asistencia semanal | Descanso no es fijo en domingo; 1 día libre por semana (cualquier día); días extra sin OS = falta |
-| 24-abr-2026 | Descuento por inasistencia | Umbral cambiado: descuento inicia en 2 faltas (50%), no en 1; 3+ faltas = 100%; 0-1 faltas = sin descuento |
+| 24-abr-2026 | Descuento por inasistencia | Regla definitiva por días trabajados: 6 días=0%, 5 días=50%, ≤4 días=100%. `inas=max(0,6-dias)`. Solo en 7 distritos con penalización. |
 
 ---
 
