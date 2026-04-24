@@ -450,7 +450,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
             <div><div class="cc-title">Descuento por Distrito</div><div class="cc-sub">Monto total deducido por inasistencias · período actual</div></div>
             <span class="chip" style="background:var(--red-l);color:var(--red)">DESCUENTOS $</span>
           </div>
-          <div style="height:260px"><canvas id="chart-pen-dist"></canvas></div>
+          <div id="pen-dist-wrap" style="height:260px"><canvas id="chart-pen-dist"></canvas></div>
         </div>
         <!-- Distribución de inasistencias -->
         <div class="cc">
@@ -1634,6 +1634,11 @@ function renderNacional(){
   fd.forEach(t=>{distDesc[t.distrito]=(distDesc[t.distrito]||0)+t.descuento;});
   const sdDesc=Object.entries(distDesc).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   if(chartPenDist)chartPenDist.destroy();
+  // Restaurar canvas si fue reemplazado por mensaje previo
+  const penWrap=document.getElementById('pen-dist-wrap');
+  if(penWrap&&!document.getElementById('chart-pen-dist')){
+    penWrap.innerHTML='<canvas id="chart-pen-dist"></canvas>';
+  }
   if(sdDesc.length){
     chartPenDist=new Chart(document.getElementById('chart-pen-dist'),{
       type:'bar',
@@ -1651,7 +1656,7 @@ function renderNacional(){
       }
     });
   } else {
-    document.getElementById('chart-pen-dist').parentElement.innerHTML='<div style="color:var(--text3);font-size:12px;padding:24px;text-align:center">Sin penalizaciones en este período</div>';
+    if(penWrap)penWrap.innerHTML='<div style="color:var(--text3);font-size:12px;padding:24px;text-align:center">Sin penalizaciones en este período</div>';
   }
 
   // Distribución de inasistencias: 0 / 1 / 2 / 3+ días
