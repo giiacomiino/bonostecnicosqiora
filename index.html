@@ -269,8 +269,8 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
     </div>
     <div>
-      <div class="s-brand">TotalPlay</div>
-      <div class="s-sub">Dirección Nacional</div>
+      <div class="s-brand">QiORA</div>
+      <div class="s-sub">Bonos Técnicos</div>
     </div>
   </div>
 
@@ -519,7 +519,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
                   <span class="chip chip-or">Prod. Media x Día</span>
                 </div>
                 <table id="tbl-top-coords">
-                  <thead><tr><th>#</th><th>Coordinador</th><th>Órdenes/Sem</th><th>Prod. Prom</th></tr></thead>
+                  <thead><tr><th>#</th><th>Coordinador</th><th>Cuadrillas</th><th>Órdenes/Sem</th><th>OS/día</th></tr></thead>
                   <tbody id="tbody-coords"></tbody>
                 </table>
               </div>
@@ -529,10 +529,11 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
             <div class="g2 mb">
               <div class="cc">
                 <div class="cc-head">
-                  <div><div class="cc-title">Inasistencias: Distribución del Equipo</div><div class="cc-sub">Técnicos agrupados por días de ausencia</div></div>
+                  <div><div class="cc-title">Inasistencias: Distribución del Equipo</div><div class="cc-sub">Técnicos agrupados por días de ausencia · clic en barra para desglose</div></div>
                   <div id="dist-pen-summary" style="font-size:11px;color:var(--red);font-weight:700"></div>
                 </div>
-                <div style="height:180px"><canvas id="chart-dist-ina"></canvas></div>
+                <div style="height:160px"><canvas id="chart-dist-ina"></canvas></div>
+                <div id="ina-dist-detail-wrap"></div>
               </div>
               <div class="cc">
                 <div class="cc-head">
@@ -1182,6 +1183,7 @@ const SVC_COLORS=['#E85420','#2563EB','#16A34A','#7C3AED','#D97706','#DC2626','#
 let allData=[], coordData=[], currentWeek=2;
 let selDistrito=null, selCoord=null, selTecnico=null;
 let globalSkill='';
+let _tierGroups=[], _inaGroups=[], _distInaGroups=[];
 function getFiltered(){return globalSkill?allData.filter(t=>t.skill===globalSkill):allData;}
 function changeSkill(v){
   globalSkill=v;
@@ -1237,11 +1239,11 @@ function bonoBase(pct,t){
 }
 const BONO_CAP=3000;
 function bono110(pct,est,meta,t){
-  if(pct<110)return 0;
-  if(t==='A')return 500; // Tipo A: $500 fijo al superar 110%
-  // Tipo B: $100 por cada 6 estrellas sobre el umbral del 110%, tope $500
-  const threshold=Math.round(meta*1.1);
-  return Math.min(Math.floor(Math.max(0,est-threshold)/6)*100,500);
+  // Tipo A: $500 fijo si alcanza ≥110%
+  if(t==='A') return pct>=110 ? 500 : 0;
+  // Tipo B/C: desde el 100% de meta, $100 por cada 6 estrellas extra, tope $500
+  if(pct<100) return 0;
+  return Math.min(Math.floor(Math.max(0,est-meta)/6)*100, 500);
 }
 function descuento(dist,inas,base,b110){
   if(!DESC_D.has(dist)||inas===0)return 0;
@@ -1292,12 +1294,21 @@ function generateData(wk){
       }
 
       // Asistencia 35 días (5 semanas Lun–Dom)
-      const asist=[];
-      for(let d=0;d<35;d++){
-        const rnd=Math.random();
-        // Domingos (índice 6, 13, 20, 27, 34) más probabilidad de descanso
-        const esDomingo=(d%7===6);
-        asist.push(esDomingo?(rnd<0.15?'p':rnd<0.25?'a':'r'):(rnd<0.78?'p':rnd<0.88?'a':'r'));
+      // Regla: 1 descanso permitido por semana; días extra sin OS = falta
+      const asist=Array(35).fill('r');
+      for(let wk=0;wk<5;wk++){
+        const noOsDays=[];
+        for(let day=0;day<7;day++){
+          const di=wk*7+day;
+          asist[di]=Math.random()<0.78?'p':'0'; // '0' = sin OS, se resuelve abajo
+          if(asist[di]==='0')noOsDays.push(di);
+        }
+        // Asignar descanso vs falta
+        if(noOsDays.length===1){asist[noOsDays[0]]='r';}
+        else if(noOsDays.length>1){
+          noOsDays.slice(0,-1).forEach(di=>asist[di]='a');
+          asist[noOsDays[noOsDays.length-1]]='r';
+        }
       }
 
       // Órdenes por día (para heatmap clickeable)
@@ -1472,7 +1483,8 @@ function renderNacional(){
   // ── Tendencia 10 semanas: construir datos ──────────────────────────────────
   let trendLabels=[], cobData=[], activasData=[], bonosData=[], osData=[], prodData=[];
   if(window._allRealData&&window._realWeeks&&window._realWeeks.length>=1){
-    const last10=window._realWeeks.slice(-10);
+    const upTo=window._currentRealWk||window._currentMonth||window._realWeeks[window._realWeeks.length-1];
+    const last10=window._realWeeks.filter(wk=>wk<=upTo).slice(-10);
     last10.forEach(wk=>{
       const wkAll=window._allRealData.filter(t=>t.semana===wk&&(!globalSkill||t.skill===globalSkill));
       const wkActivas=wkAll.filter(t=>t.nOrdenes>0).length;
@@ -1569,15 +1581,19 @@ function renderNacional(){
       <th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Bono total</th>
       <th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Promedio</th>
     </tr></thead><tbody>`;
-  tiers.forEach(tier=>{
+  _tierGroups=[];
+  tiers.forEach((tier,ti)=>{
     const grp=fdActivas.filter(t=>t.pct>=tier.pctMin&&t.pct<tier.pctMax);
+    _tierGroups.push({tier,grp});
     const cnt=grp.length;
     const pctOfTotal=(cnt/totalActivas*100).toFixed(1);
     const monto=grp.reduce((s,t)=>s+t.bonoFinal,0);
     const conB=grp.filter(t=>t.bonoFinal>0).length;
     const prom=conB>0?Math.round(monto/conB):0;
-    sensHtml+=`<tr style="border-bottom:1px solid #F5F5F8">
-      <td style="padding:8px 10px"><span style="background:${tier.bg};color:${tier.tc};font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap">${tier.label}</span></td>
+    const clickable=cnt>0?`onclick="showTierDrill(${ti})" style="border-bottom:1px solid #F5F5F8;cursor:pointer;transition:background .1s" onmouseover="this.style.background='#FAFAFA'" onmouseout="this.style.background=''"`:
+      `style="border-bottom:1px solid #F5F5F8"`;
+    sensHtml+=`<tr ${clickable}>
+      <td style="padding:8px 10px"><span style="background:${tier.bg};color:${tier.tc};font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap">${tier.label}</span>${cnt>0?`<span style="font-size:9px;color:var(--text3);margin-left:6px">ver desglose →</span>`:''}</td>
       <td style="padding:8px 10px;text-align:center;font-weight:700">${cnt}</td>
       <td style="padding:8px 10px;text-align:center">
         <div style="display:flex;align-items:center;gap:5px;justify-content:center">
@@ -1652,13 +1668,17 @@ function renderNacional(){
       <th style="padding:7px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">% del total</th>
       <th style="padding:7px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Descuento</th>
     </tr></thead><tbody>`;
-  inaBuckets.forEach(b=>{
+  _inaGroups=[];
+  inaBuckets.forEach((b,bi)=>{
     const grp=fd.filter(t=>t.inas>=b.min&&t.inas<b.max);
+    _inaGroups.push({bucket:b,grp});
     const cnt=grp.length;
     const pctT=fd.length>0?(cnt/fd.length*100).toFixed(1):'0';
     const desc=grp.reduce((s,t)=>s+t.descuento,0);
-    inaHtml+=`<tr style="border-bottom:1px solid #F5F5F8">
-      <td style="padding:8px 10px"><span style="background:${b.bg};color:${b.tc};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">${b.label}</span></td>
+    const clickable=cnt>0?`onclick="showInaDrill(${bi},false)" style="border-bottom:1px solid #F5F5F8;cursor:pointer;transition:background .1s" onmouseover="this.style.background='#FAFAFA'" onmouseout="this.style.background=''"`:
+      `style="border-bottom:1px solid #F5F5F8"`;
+    inaHtml+=`<tr ${clickable}>
+      <td style="padding:8px 10px"><span style="background:${b.bg};color:${b.tc};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">${b.label}</span>${cnt>0?`<span style="font-size:9px;color:var(--text3);margin-left:6px">ver desglose →</span>`:''}</td>
       <td style="padding:8px 10px;text-align:center;font-weight:700">${cnt}</td>
       <td style="padding:8px 10px;text-align:center">
         <div style="display:flex;align-items:center;gap:5px;justify-content:center">
@@ -1841,16 +1861,23 @@ function renderDistDetail(d){
       scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>fk(Math.abs(v)),font:{size:10}},grid:{color:'#F3F4F6'}}}}
   });
 
-  // Top coordinadores del distrito
-  const distCoords=coordData.filter(c=>c.distrito===d).sort((a,b)=>b.ordenesSem-a.ordenesSem).slice(0,7);
-  document.getElementById('tbody-coords').innerHTML=distCoords.length?distCoords.map((c,i)=>`
+  // Top coordinadores del distrito — ordenados por bono total del equipo, descendente
+  const distCoordsRaw=coordData.filter(c=>c.distrito===d).map(c=>{
+    const cTecs=getFiltered().filter(t=>c.tecnicosIds.includes(t.id));
+    const teamBono=cTecs.reduce((s,t)=>s+t.bonoFinal,0);
+    const teamOS=cTecs.reduce((s,t)=>s+t.nOrdenes,0);
+    const teamAct=cTecs.filter(t=>t.nOrdenes>0).length;
+    const prodDia=teamAct>0?(teamOS/teamAct/6).toFixed(1):'—';
+    return {...c, teamBono, teamOS, teamAct, prodDia};
+  }).sort((a,b)=>parseFloat(b.prodDia||0)-parseFloat(a.prodDia||0)).slice(0,10);
+  document.getElementById('tbody-coords').innerHTML=distCoordsRaw.length?distCoordsRaw.map((c,i)=>`
     <tr onclick="openCoord('${c.id}')">
       <td><span class="rk ${i===0?'rk1':i===1?'rk2':i===2?'rk3':''}">${i+1}</span></td>
       <td style="font-weight:500">${c.nombre}</td>
-      <td>${c.ordenesSem}</td>
-      <td style="font-weight:700;color:var(--or)">${c.prodProm}</td>
-    </tr>`):'<tr><td colspan="4" style="color:var(--text3);text-align:center;padding:12px">Sin coordinadores registrados</td></tr>';
-  distCoords.forEach(r=>r.innerHTML='');
+      <td style="text-align:center;font-weight:600">${c.tecnicosIds.length}</td>
+      <td style="text-align:center">${c.teamOS}</td>
+      <td style="font-weight:700;color:var(--or);text-align:center">${c.prodDia}</td>
+    </tr>`):'<tr><td colspan="5" style="color:var(--text3);text-align:center;padding:12px">Sin coordinadores registrados</td></tr>';
 
   // OS donut — desglose real por tipo de servicio del distrito
   const tipoCount={};
@@ -1889,13 +1916,17 @@ function renderDistDetail(d){
   document.getElementById('dist-pen-summary').textContent=
     dConIna>0?`${dConIna} cuadrilla(s) penalizadas · ${f$(dTotalDesc)} descontado`:'Sin penalizaciones';
 
-  // Gráfica: técnicos agrupados por días de ausencia
+  // Gráfica + tabla drill-down: técnicos agrupados por días de ausencia
   const dBuckets=[
-    {label:'0 días',min:0,max:1,color:'#16A34A'},
-    {label:'1 día',min:1,max:2,color:'#D97706'},
-    {label:'2 días',min:2,max:3,color:'#DC2626'},
-    {label:'3+ días',min:3,max:99,color:'#991B1B'}
+    {label:'0 días',bg:'#DCFCE7',tc:'#16A34A',color:'#16A34A',min:0,max:1},
+    {label:'1 día', bg:'#FEF3C7',tc:'#D97706',color:'#D97706',min:1,max:2},
+    {label:'2 días',bg:'#FEE2E2',tc:'#DC2626',color:'#DC2626',min:2,max:3},
+    {label:'3+ días',bg:'#FEE2E2',tc:'#991B1B',color:'#991B1B',min:3,max:99}
   ];
+  _distInaGroups=[];
+  dBuckets.forEach(b=>{
+    _distInaGroups.push({bucket:b,grp:tecs.filter(t=>t.inas>=b.min&&t.inas<b.max)});
+  });
   if(chartDistIna)chartDistIna.destroy();
   chartDistIna=new Chart(document.getElementById('chart-dist-ina'),{
     type:'bar',
@@ -1910,13 +1941,46 @@ function renderDistDetail(d){
     },
     options:{
       responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} cuadrilla(s)`}}},
+      onClick:(evt,els)=>{if(els.length)showInaDrill(els[0].index,true);},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} cuadrilla(s) · clic para desglose`}}},
       scales:{
         x:{grid:{display:false},ticks:{font:{size:11}}},
         y:{ticks:{stepSize:1,font:{size:10}},grid:{color:'#F3F4F6'}}
       }
     }
   });
+  // Tabla resumen de inasistencias del distrito (clickeable)
+  const inaDistWrap=document.getElementById('ina-dist-detail-wrap');
+  if(inaDistWrap){
+    const totalTecs=tecs.length||1;
+    let iDHtml=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:12px">
+      <thead><tr style="background:#FAFAFA">
+        <th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Ausencias</th>
+        <th style="padding:6px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Cuadrillas</th>
+        <th style="padding:6px 10px;text-align:center;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">% del distrito</th>
+        <th style="padding:6px 10px;text-align:right;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border)">Descuento</th>
+      </tr></thead><tbody>`;
+    _distInaGroups.forEach(({bucket:b,grp},bi)=>{
+      const cnt=grp.length;
+      const pctT=(cnt/totalTecs*100).toFixed(1);
+      const desc=grp.reduce((s,t)=>s+t.descuento,0);
+      const cl=cnt>0?`onclick="showInaDrill(${bi},true)" style="border-bottom:1px solid #F5F5F8;cursor:pointer;transition:background .1s" onmouseover="this.style.background='#FAFAFA'" onmouseout="this.style.background=''"`:
+        `style="border-bottom:1px solid #F5F5F8"`;
+      iDHtml+=`<tr ${cl}>
+        <td style="padding:7px 10px"><span style="background:${b.bg};color:${b.tc};font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">${b.label}</span>${cnt>0?`<span style="font-size:9px;color:var(--text3);margin-left:5px">ver →</span>`:''}</td>
+        <td style="padding:7px 10px;text-align:center;font-weight:700">${cnt}</td>
+        <td style="padding:7px 10px;text-align:center">
+          <div style="display:flex;align-items:center;gap:5px;justify-content:center">
+            <div style="width:36px;height:4px;background:#F0F0F5;border-radius:2px;overflow:hidden"><div style="width:${pctT}%;height:100%;background:${b.tc};border-radius:2px"></div></div>
+            <span style="font-size:11px;font-weight:600;color:${b.tc}">${pctT}%</span>
+          </div>
+        </td>
+        <td style="padding:7px 10px;text-align:right;font-weight:600;color:var(--red)">${desc>0?f$(desc):'—'}</td>
+      </tr>`;
+    });
+    iDHtml+=`</tbody></table>`;
+    inaDistWrap.innerHTML=iDHtml;
+  }
 
   // Top 5 penalizados
   const top5pen=tecs.filter(t=>t.descuento>0).sort((a,b)=>b.descuento-a.descuento).slice(0,5);
@@ -1941,7 +2005,7 @@ function renderDistDetail(d){
   const sortCrit=(document.getElementById('top-tec-sort')||{}).value||'pct';
   const colLabels={pct:'% Alcance',nOrdenes:'OS',dias:'Días',bonoFinal:'Bono Final',estrellas:'⭐ Estrellas'};
   document.getElementById('top-tec-col-h').textContent=colLabels[sortCrit]||'% Alcance';
-  const top10=sortArr([...tecs],sortCrit,-1).slice(0,10);
+  const top10=sortArr([...tecs],sortCrit,1).slice(0,10);
   document.getElementById('tbody-top-dist-tecs').innerHTML=top10.map((t,i)=>{
     const val=sortCrit==='pct'?pctBadge(t.pct)
       :sortCrit==='bonoFinal'?`<span style="font-weight:700;color:var(--green)">${f$(t.bonoFinal)}</span>`
@@ -1959,7 +2023,8 @@ function renderDistDetail(d){
 
   // ── Tendencia del distrito: últimas 10 semanas ────────────────────────────
   if(window._allRealData&&window._realWeeks){
-    const last10=window._realWeeks.slice(-10);
+    const upTo=window._currentRealWk||window._currentMonth||window._realWeeks[window._realWeeks.length-1];
+    const last10=window._realWeeks.filter(wk=>wk<=upTo).slice(-10);
     const dtLabels=[],dtCob=[],dtBonos=[];
     last10.forEach(wk=>{
       const wkTecs=window._allRealData.filter(t=>t.distrito===d&&t.semana===wk&&(!globalSkill||t.skill===globalSkill));
@@ -1979,7 +2044,7 @@ function renderDistDetail(d){
       options:{
         responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-          label:c=>c.datasetIndex===0?`Cobertura: ${c.parsed.y}%`:`Bonos: ${f$(c.parsed.y)}`
+          label:c=>c.datasetIndex===0?`Bonos: ${f$(c.parsed.y)}`:`Cobertura: ${c.parsed.y}%`
         }}},
         scales:{
           x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
@@ -2083,6 +2148,8 @@ function openCoord(cid){
 }
 
 function renderCoordDetail(coord){
+  // Siempre reiniciar el sort del ranking de técnicos a descendente (dir=1 = mayor primero) al abrir un coordinador
+  _sort.coordTecs={col:'pct',dir:1};
   document.getElementById('coord-detail-name').textContent=coord.nombre;
   document.getElementById('coord-detail-sub').textContent=`Coordinador Operativo · ${distShort(coord.distrito)}`;
 
@@ -2109,7 +2176,7 @@ function renderCoordDetail(coord){
       <span class="status-tag ${asistPct>=80?'st-green':'st-yellow'}">${asistPct>=80?'Regular':'Baja asistencia'}</span></div>
     <div class="kpi-c"><div class="kpi-label">PRODUCTIVIDAD PROM.</div>
       <div class="kpi-val or">${prodProm}</div>
-      <div class="kpi-sub">OS / cuadrilla activa</div></div>
+      <div class="kpi-sub">OS / cuadrilla / día</div></div>
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">TOTAL BONOS EQUIPO</div>
       <div class="kpi-val or">${fk(tendBono)}</div>
       <div class="kpi-sub">${total} técnicos en equipo</div></div>`;
@@ -2207,7 +2274,8 @@ function renderCoordDetail(coord){
 
   // Tendencia del equipo: bonos semanales del coordinador
   if(window._allRealData&&window._realWeeks){
-    const last10=window._realWeeks.slice(-10);
+    const upTo=window._currentRealWk||window._currentMonth||window._realWeeks[window._realWeeks.length-1];
+    const last10=window._realWeeks.filter(wk=>wk<=upTo).slice(-10);
     const ctLabels=[],ctBonos=[],ctCob=[];
     const tecIds=new Set(tecs.map(t=>t.id));
     last10.forEach(wk=>{
@@ -2227,7 +2295,7 @@ function renderCoordDetail(coord){
       options:{
         responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-          label:c=>c.datasetIndex===0?`Cobertura: ${c.parsed.y}%`:`Bonos equipo: ${f$(c.parsed.y)}`
+          label:c=>c.datasetIndex===0?`Bonos equipo: ${f$(c.parsed.y)}`:`Cobertura: ${c.parsed.y}%`
         }}},
         scales:{
           x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
@@ -2438,36 +2506,105 @@ function renderFicha(t){
       scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}}}}
   });
 
-  // Heatmap — semanas con fechas y clickable
-  window._curOrdersByDay=t.ordersByDay||{};
+  // Heatmap — muestra el mes del periodo seleccionado
   document.getElementById('day-detail-panel').style.display='none';
-  const hmStart=window._hmStart||new Date();
+  const MS_DAY=86400000;
+  const hmDataStart=window._hmStart?new Date(window._hmStart):new Date();
+  hmDataStart.setHours(0,0,0,0);
+  const calBase=window._calMonthStart||getCalMonthStart(hmDataStart);
+
+  // ── Construir curOBD (orders by calDi) ──────────────────────────────────────
+  // calDi = 0-34 relativo a calBase (independiente de _hmStart)
+  const curOBD={};
+  if(t.semana){
+    // Datos reales: t.semOrders tiene o.dia (string YYYY-MM-DD) y o.fecha (Date)
+    (t.semOrders||[]).forEach(o=>{
+      if(!o.dia)return;
+      const dDate=new Date(o.dia+'T12:00:00');
+      const calDi=Math.round((dDate.getTime()-calBase.getTime())/MS_DAY);
+      if(calDi>=0&&calDi<35){
+        if(!curOBD[calDi])curOBD[calDi]=[];
+        const fd=o.fecha instanceof Date?o.fecha:new Date(o.dia+'T00:00:00');
+        curOBD[calDi].push({
+          os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,
+          estrellas:o.puntos||svcPoints(o.tipo),
+          hora:fd instanceof Date&&!isNaN(fd)?fd.toTimeString().slice(0,5):'—'
+        });
+      }
+    });
+    // Ordenar por hora dentro de cada día
+    Object.values(curOBD).forEach(arr=>arr.sort((a,b)=>a.hora.localeCompare(b.hora)));
+  } else {
+    // Datos simulados: ordersByDay ya indexado relativo a hmDataStart (~calBase)
+    const offset=Math.round((hmDataStart.getTime()-calBase.getTime())/MS_DAY);
+    Object.entries(t.ordersByDay||{}).forEach(([di,orders])=>{
+      const calDi=parseInt(di)+offset;
+      if(calDi>=0&&calDi<35)curOBD[calDi]=orders;
+    });
+  }
+  window._curOrdersByDay=curOBD;
+
+  // ── Construir calAsist (estado por calDi) ────────────────────────────────────
+  const calAsist=new Array(35).fill('r');
+  if(t.semana){
+    // Marcar 'p' donde hay órdenes
+    Object.keys(curOBD).forEach(di=>{calAsist[parseInt(di)]='p';});
+    // Determinar qué semana del calendario es la semana activa del técnico
+    const techMon=getMondayOfWeek(new Date(t.semana+'T12:00:00'));
+    const techCalDi=Math.round((techMon.getTime()-calBase.getTime())/MS_DAY);
+    const activeWk=Math.floor(techCalDi/7); // 0-4
+    // En la semana activa: días sin órdenes → resolver descanso/falta
+    if(activeWk>=0&&activeWk<5){
+      const noOsDays=[];
+      for(let d=0;d<7;d++){
+        const di=activeWk*7+d;
+        if(calAsist[di]!=='p')noOsDays.push(di);
+      }
+      if(noOsDays.length===1){calAsist[noOsDays[0]]='r';}
+      else if(noOsDays.length>1){
+        noOsDays.slice(0,-1).forEach(di=>{calAsist[di]='a';});
+        calAsist[noOsDays[noOsDays.length-1]]='r';
+      }
+    }
+  } else {
+    // Datos simulados: reindexar t.asistencia
+    const offset=Math.round((hmDataStart.getTime()-calBase.getTime())/MS_DAY);
+    (t.asistencia||[]).forEach((v,di)=>{
+      const calDi=di+offset;
+      if(calDi>=0&&calDi<35)calAsist[calDi]=v;
+    });
+  }
+
+  // ── Renderizar ───────────────────────────────────────────────────────────────
   const WDYS=['L','M','X','J','V','S','D'];
   const MNS4=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  let hmHtml=`<div style="display:flex;margin-bottom:5px;align-items:center">
+  const calMonth=new Date(calBase);calMonth.setDate(calMonth.getDate()+6);
+  const mesNombre=`${MNS4[calMonth.getMonth()]} ${calMonth.getFullYear()}`;
+  let hmHtml=`<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">${mesNombre}</div>`;
+  hmHtml+=`<div style="display:flex;margin-bottom:5px;align-items:center">
     <div style="width:52px;flex-shrink:0"></div>
     ${WDYS.map(d=>`<div style="flex:1;text-align:center;font-size:9px;font-weight:700;color:var(--text3)">${d}</div>`).join('')}
   </div>`;
   let pCount=0,aCount=0;
   for(let wk=0;wk<5;wk++){
-    const wkMon=new Date(hmStart);wkMon.setDate(wkMon.getDate()+wk*7);
+    const wkMon=new Date(calBase);wkMon.setDate(wkMon.getDate()+wk*7);
     const wkLabel=`${wkMon.getDate()} ${MNS4[wkMon.getMonth()]}`;
     hmHtml+=`<div style="display:flex;align-items:center;margin-bottom:3px">
       <div style="width:52px;flex-shrink:0;font-size:9px;color:var(--text3);line-height:1.2">${wkLabel}</div>`;
     for(let day=0;day<7;day++){
-      const di=wk*7+day;
-      const v=(t.asistencia||[])[di]||'r';
-      const dd=new Date(hmStart);dd.setDate(dd.getDate()+di);
+      const calDi=wk*7+day;
+      const dd=new Date(calBase);dd.setDate(dd.getDate()+calDi);
+      const v=calAsist[calDi]||'r';
       const dateN=dd.getDate();
-      const clickable=v==='p'&&window._curOrdersByDay[di];
-      const nOS=clickable?window._curOrdersByDay[di].length:0;
+      const clickable=v==='p'&&curOBD[calDi]&&curOBD[calDi].length>0;
+      const nOS=clickable?curOBD[calDi].length:0;
       if(v==='p')pCount++;else if(v==='a')aCount++;
       const bg=v==='p'?'#22C55E':v==='a'?'#EF4444':'#E9EAEC';
-      const txtCol=(v==='r')?'#9CA3AF':'white';
+      const txtCol=v==='r'?'#9CA3AF':'white';
       const border=clickable?'border:2px solid #15803D;':'border:2px solid transparent;';
       const cursor=clickable?'pointer':'default';
-      const title=clickable?`${dd.getDate()} ${MNS4[dd.getMonth()]} — ${nOS} órdenes · clic para ver`:v==='a'?`${dd.getDate()} ${MNS4[dd.getMonth()]} — Inasistencia`:`${dd.getDate()} ${MNS4[dd.getMonth()]}`;
-      hmHtml+=`<div style="flex:1;aspect-ratio:1;background:${bg};${border}border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${cursor};margin:0 1px" title="${title}" ${clickable?`onclick="showDayDetail(${di})"`:''}>
+      const title=clickable?`${dateN} ${MNS4[dd.getMonth()]} — ${nOS} órdenes · clic para ver`:v==='a'?`${dateN} ${MNS4[dd.getMonth()]} — Inasistencia`:`${dateN} ${MNS4[dd.getMonth()]}`;
+      hmHtml+=`<div style="flex:1;aspect-ratio:1;background:${bg};${border}border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:${cursor};margin:0 1px" title="${title}" ${clickable?`onclick="showDayDetail(${calDi})"`:''}>
         <span style="font-size:9px;font-weight:700;color:${txtCol};line-height:1">${dateN}</span>
         ${clickable?`<span style="font-size:7px;color:rgba(255,255,255,.9);line-height:1.2">${nOS} OS</span>`:''}
       </div>`;
@@ -2479,7 +2616,7 @@ function renderFicha(t){
     <div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:11px;height:11px;background:#22C55E;border-radius:3px;border:2px solid #15803D"></div>Con órdenes (${pCount} días) — clic para ver detalle</div>
       <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:11px;height:11px;background:#EF4444;border-radius:3px"></div>Inasistencia (${aCount} días)</div>
-      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:11px;height:11px;background:#E9EAEC;border-radius:3px"></div>Descanso / sin datos</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:11px;height:11px;background:#E9EAEC;border-radius:3px"></div>Descanso (1 por semana) / sin datos</div>
     </div>`;
 
   // OS por tipo de servicio del técnico
@@ -2983,30 +3120,51 @@ function rebuildFromRawOrders(){
       const pts=svcPoints(o.tipo); // ← usa tabla de Ajustes
       if(!byWk[o.wk])byWk[o.wk]={puntos:0,diasSet:new Set(),ordenes:[]};
       byWk[o.wk].puntos+=pts;
-      if(o.fecha.getDay()!==0)byWk[o.wk].diasSet.add(o.dia);
+      byWk[o.wk].diasSet.add(o.dia); // cuenta todos los días con OS, sin excluir domingo
       byWk[o.wk].ordenes.push({...o,puntos:pts});
     });
 
-    // Heatmap 35 días con historial completo del técnico
+    // Heatmap 35 días (5 semanas Lun–Dom)
+    // Regla: ≥1 OS en el día → activo ('p')
+    //        0 OS pero dentro del período activo → tentativo ('0')
+    //        fuera del período → sin datos ('r')
+    // Por semana: 1 día sin OS = descanso ('r'); días extra sin OS = falta ('a')
     const techDaySet=new Set(tech.orders.map(o=>o.dia));
-    const asist=[];
+    const asist=Array(35).fill('r');
     const ordersByDayFull={};
+
+    // Primera pasada: marcar 'p', 'r' (fuera de rango) o '0' (en rango sin OS)
     for(let di=0;di<35;di++){
       const d=new Date(hmStart);d.setDate(d.getDate()+di);
       const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      if(d.getDay()===0){asist.push('r');}
-      else if(techDaySet.has(dStr)){
-        asist.push('p');
+      if(techDaySet.has(dStr)){
+        asist[di]='p';
         const dayOrds=tech.orders.filter(o=>o.dia===dStr).sort((a,b)=>a.fecha-b.fecha);
         if(dayOrds.length){
           ordersByDayFull[di]=dayOrds.map(o=>({
             os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,
-            estrellas:svcPoints(o.tipo), // puntos actualizados con Ajustes
+            estrellas:svcPoints(o.tipo),
             hora:o.fecha.toTimeString().slice(0,5),fecha:dStr
           }));
         }
-      }else{
-        asist.push((minDate&&maxDate&&d>=minDate&&d<=maxDate)?'a':'r');
+      } else if(minDate&&maxDate&&d>=minDate&&d<=maxDate){
+        asist[di]='0'; // sin OS dentro del período activo
+      }
+      // else ya es 'r' por default
+    }
+
+    // Segunda pasada: resolver '0' por semana → descanso o falta
+    for(let wk=0;wk<5;wk++){
+      const noOsDays=[];
+      for(let day=0;day<7;day++){
+        const di=wk*7+day;
+        if(asist[di]==='0') noOsDays.push(di);
+      }
+      if(noOsDays.length===1){
+        asist[noOsDays[0]]='r'; // único día sin OS = descanso
+      } else if(noOsDays.length>1){
+        noOsDays.slice(0,-1).forEach(di=>{asist[di]='a';}); // primeros = falta
+        asist[noOsDays[noOsDays.length-1]]='r';              // último = descanso
       }
     }
 
@@ -3132,11 +3290,23 @@ function changePeriodType(v){
 function changeMonth(ym){
   if(!ym||!window._allRealData)return;
   window._currentMonth=ym;
+  window._calMonthStart=getCalMonthStart(new Date(ym+'-01T12:00:00'));
   const monthWeeks=(window._realWeeks||[]).filter(wk=>wk.slice(0,7)===ym);
   window._periodWeeks=monthWeeks.length||1;
   const raw=window._allRealData.filter(t=>monthWeeks.includes(t.semana));
   setAllDataAndCoords(aggregateByTech(raw));
   renderAll();
+}
+
+// Retorna el lunes de la semana que contiene el día 1 del mes de 'date'
+function getCalMonthStart(date){
+  const d=new Date(date);
+  d.setDate(1);
+  const dow=d.getDay(); // 0=Dom,1=Lun,...
+  const diffToMon=dow===0?-6:1-dow;
+  d.setDate(d.getDate()+diffToMon);
+  d.setHours(0,0,0,0);
+  return d;
 }
 
 function changeWeek(wOrIdx){
@@ -3147,6 +3317,7 @@ function changeWeek(wOrIdx){
     const wk=opt?opt.getAttribute('data-wk'):null;
     if(wk&&window._allRealData){
       window._currentRealWk=wk;
+      window._calMonthStart=getCalMonthStart(new Date(wk+'T12:00:00'));
       setAllDataAndCoords(window._allRealData.filter(t=>t.semana===wk));
       renderAll();
       return;
@@ -3184,6 +3355,161 @@ function showDayDetail(dayIdx){
 }
 
 // ═══════════════════════════════════════════
+// DRILL-DOWN: Desglose por bracket de alcance
+// ═══════════════════════════════════════════
+let _drillSort={col:'pct',dir:-1};
+let _inaDrillSort={col:'inas',dir:-1};
+
+function showTierDrill(ti){
+  const {tier,grp}=_tierGroups[ti];
+  if(!grp||grp.length===0)return;
+  renderDrillTable(grp,tier,ti);
+  document.getElementById('tier-drill-overlay').style.display='flex';
+}
+
+function closeTierDrill(){
+  document.getElementById('tier-drill-overlay').style.display='none';
+}
+
+function sortDrill(col,ti){
+  if(_drillSort.col===col)_drillSort.dir*=-1;
+  else{_drillSort.col=col;_drillSort.dir=-1;}
+  renderDrillTable(_tierGroups[ti].grp,_tierGroups[ti].tier,ti);
+}
+
+function showInaDrill(bi, fromDist){
+  const groups = fromDist ? _distInaGroups : _inaGroups;
+  const {bucket, grp} = groups[bi] || {};
+  if(!grp || grp.length===0) return;
+  _inaDrillSort={col:'inas',dir:-1};
+  renderInaDrillTable(grp, bucket, bi, fromDist);
+  document.getElementById('tier-drill-overlay').style.display='flex';
+}
+
+function sortInaDrill(col, bi, fromDist){
+  if(_inaDrillSort.col===col) _inaDrillSort.dir*=-1;
+  else { _inaDrillSort.col=col; _inaDrillSort.dir=-1; }
+  const groups = fromDist ? _distInaGroups : _inaGroups;
+  const {bucket, grp} = groups[bi];
+  renderInaDrillTable(grp, bucket, bi, fromDist);
+}
+
+function renderInaDrillTable(grp, bucket, bi, fromDist){
+  const cols=[
+    {key:'nombre',     label:'Técnico',       align:'left'},
+    {key:'distrito',   label:'Distrito',      align:'left'},
+    {key:'skill',      label:'Cuadrilla',     align:'center'},
+    {key:'coordNombre',label:'Coordinador',   align:'left'},
+    {key:'inas',       label:'Inasistencias', align:'center'},
+    {key:'dias',       label:'Días trab.',    align:'center'},
+    {key:'pct',        label:'% Meta',        align:'center'},
+    {key:'bonoBase',   label:'Bono Base',     align:'right'},
+    {key:'bono110',    label:'110%',          align:'right'},
+    {key:'descuento',  label:'Descuento',     align:'right'},
+    {key:'bonoFinal',  label:'Bono Final',    align:'right'},
+  ];
+  const fromDistVal = fromDist ? 'true' : 'false';
+  const sorted=[...grp].sort((a,b)=>{
+    const av=a[_inaDrillSort.col], bv=b[_inaDrillSort.col];
+    if(typeof av==='string') return _inaDrillSort.dir*(av.localeCompare(bv));
+    return _inaDrillSort.dir*(av-bv);
+  });
+  const distShortD=d=>(d||'').replace(/GS2-[A-Z]+-/,'').replace(/^[A-Z]{3} /,'');
+  const ch=col=>_inaDrillSort.col===col?(_inaDrillSort.dir===-1?' ↓':' ↑'):'';
+
+  document.getElementById('tier-drill-title').innerHTML=
+    `<span style="background:${bucket.bg};color:${bucket.tc};font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px">${bucket.label}</span>
+     <span style="font-size:13px;color:var(--text2);margin-left:8px">${sorted.length} cuadrillas${fromDist?' (distrito)':' (nacional)'}</span>`;
+
+  const totalDesc=sorted.reduce((s,t)=>s+t.descuento,0);
+  document.getElementById('tier-drill-footer').textContent=
+    `Total descuento: ${totalDesc>0?f$(totalDesc):'$0'} · Con descuento: ${sorted.filter(t=>t.descuento>0).length}`;
+
+  let h=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#FAFAFA;position:sticky;top:0">`;
+  cols.forEach(c=>{
+    h+=`<th onclick="sortInaDrill('${c.key}',${bi},${fromDistVal})" style="padding:7px 10px;text-align:${c.align};font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none">${c.label}${ch(c.key)}</th>`;
+  });
+  h+=`</tr></thead><tbody>`;
+  sorted.forEach(t=>{
+    const pctC=t.pct>=100?'var(--green)':t.pct>=80?'var(--or)':'var(--red)';
+    h+=`<tr style="border-bottom:1px solid #F5F5F8" onmouseover="this.style.background='#FAFAFA'" onmouseout="this.style.background=''">
+      <td style="padding:7px 10px;font-weight:500">${t.nombre||t.ffm}</td>
+      <td style="padding:7px 10px;color:var(--text2);font-size:11px;white-space:nowrap">${distShortD(t.distrito)}</td>
+      <td style="padding:7px 10px;text-align:center"><span class="sp sp-${SK_KEY[t.skill]||'N'}">${t.skill||'—'}</span></td>
+      <td style="padding:7px 10px;color:var(--text2);font-size:11px">${t.coordNombre||'—'}</td>
+      <td style="padding:7px 10px;text-align:center;font-weight:800;color:${t.inas===0?'var(--green)':t.inas===1?'var(--yellow)':'var(--red)'}">${t.inas}</td>
+      <td style="padding:7px 10px;text-align:center;color:var(--text2)">${t.dias}/6</td>
+      <td style="padding:7px 10px;text-align:center;font-weight:700;color:${pctC}">${t.pct.toFixed(1)}%</td>
+      <td style="padding:7px 10px;text-align:right">${t.bonoBase>0?f$(t.bonoBase):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;color:var(--green)">${t.bono110>0?f$(t.bono110):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;color:var(--red)">${t.descuento>0?f$(t.descuento):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:700;color:${t.bonoFinal>0?'var(--or)':'var(--text3)'}">${t.bonoFinal>0?f$(t.bonoFinal):'$0'}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table>`;
+  document.getElementById('tier-drill-body').innerHTML=h;
+}
+
+function renderDrillTable(grp,tier,ti){
+  const cols=[
+    {key:'nombre',    label:'Técnico',    align:'left'},
+    {key:'distrito',  label:'Distrito',   align:'left'},
+    {key:'skill',     label:'Cuadrilla',  align:'center'},
+    {key:'coordNombre',label:'Coordinador',align:'left'},
+    {key:'estrellas', label:'Estrellas',  align:'center'},
+    {key:'meta',      label:'Meta',       align:'center'},
+    {key:'pct',       label:'% Meta',     align:'center'},
+    {key:'inas',      label:'Inasist.',   align:'center'},
+    {key:'bonoBase',  label:'Bono Base',  align:'right'},
+    {key:'bono110',   label:'110%',       align:'right'},
+    {key:'descuento', label:'Desc.',      align:'right'},
+    {key:'bonoFinal', label:'Bono Final', align:'right'},
+  ];
+  const sorted=[...grp].sort((a,b)=>{
+    const av=a[_drillSort.col],bv=b[_drillSort.col];
+    if(typeof av==='string')return _drillSort.dir*(av.localeCompare(bv));
+    return _drillSort.dir*(av-bv);
+  });
+  const distShortD=d=>(d||'').replace(/GS2-[A-Z]+-/,'').replace(/^[A-Z]{3} /,'');
+  const chevron=col=>_drillSort.col===col?(_drillSort.dir===-1?' ↓':' ↑'):'';
+
+  document.getElementById('tier-drill-title').innerHTML=
+    `<span style="background:${tier.bg};color:${tier.tc};font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px">${tier.label}</span>
+     <span style="font-size:13px;color:var(--text2);margin-left:8px">${sorted.length} cuadrillas</span>`;
+
+  const totalBF=sorted.reduce((s,t)=>s+t.bonoFinal,0);
+  document.getElementById('tier-drill-footer').textContent=
+    `Total bono: ${f$(totalBF)} · Promedio: ${sorted.length>0?f$(Math.round(totalBF/sorted.filter(t=>t.bonoFinal>0).length||1)):'—'}`;
+
+  let h=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:#FAFAFA;position:sticky;top:0">`;
+  cols.forEach(c=>{
+    h+=`<th onclick="sortDrill('${c.key}',${ti})" style="padding:7px 10px;text-align:${c.align};font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;user-select:none">${c.label}${chevron(c.key)}</th>`;
+  });
+  h+=`</tr></thead><tbody>`;
+  sorted.forEach(t=>{
+    const pctC=t.pct>=100?'var(--green)':t.pct>=80?'var(--or)':'var(--red)';
+    h+=`<tr style="border-bottom:1px solid #F5F5F8" onmouseover="this.style.background='#FAFAFA'" onmouseout="this.style.background=''">
+      <td style="padding:7px 10px;font-weight:500">${t.nombre||t.ffm}</td>
+      <td style="padding:7px 10px;color:var(--text2);font-size:11px;white-space:nowrap">${distShortD(t.distrito)}</td>
+      <td style="padding:7px 10px;text-align:center"><span class="sp sp-${SK_KEY[t.skill]||'N'}">${t.skill||'—'}</span></td>
+      <td style="padding:7px 10px;color:var(--text2);font-size:11px">${t.coordNombre||'—'}</td>
+      <td style="padding:7px 10px;text-align:center;font-weight:600">${t.estrellas}</td>
+      <td style="padding:7px 10px;text-align:center;color:var(--text2)">${t.meta}</td>
+      <td style="padding:7px 10px;text-align:center;font-weight:700;color:${pctC}">${t.pct.toFixed(1)}%</td>
+      <td style="padding:7px 10px;text-align:center;color:${t.inas>0?'var(--red)':'var(--text2)'}">${t.inas}</td>
+      <td style="padding:7px 10px;text-align:right">${t.bonoBase>0?f$(t.bonoBase):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;color:var(--green)">${t.bono110>0?f$(t.bono110):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;color:var(--red)">${t.descuento>0?f$(t.descuento):'—'}</td>
+      <td style="padding:7px 10px;text-align:right;font-weight:700;color:${t.bonoFinal>0?'var(--or)':'var(--text3)'}">${t.bonoFinal>0?f$(t.bonoFinal):'$0'}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table>`;
+  document.getElementById('tier-drill-body').innerHTML=h;
+}
+
+// ═══════════════════════════════════════════
 // INIT — sin datos falsos; todo viene de Supabase
 // ═══════════════════════════════════════════
 allData=[];
@@ -3192,5 +3518,25 @@ renderNacional();
 renderConfig();
 loadFromSupabase();
 </script>
+
+<!-- MODAL: Desglose por bracket de alcance -->
+<div id="tier-drill-overlay" onclick="if(event.target===this)closeTierDrill()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:24px">
+  <div style="background:white;border-radius:14px;width:min(1100px,95vw);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden">
+    <!-- Header -->
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Desglose de cuadrillas</div>
+        <div id="tier-drill-title" style="display:flex;align-items:center;gap:6px"></div>
+      </div>
+      <button onclick="closeTierDrill()" style="width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:16px;font-family:inherit">✕</button>
+    </div>
+    <!-- Body con scroll -->
+    <div id="tier-drill-body" style="overflow-y:auto;flex:1"></div>
+    <!-- Footer totales -->
+    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;flex-shrink:0">
+      <span id="tier-drill-footer" style="font-size:12px;font-weight:600;color:var(--text2)"></span>
+    </div>
+  </div>
+</div>
 </body>
 </html>

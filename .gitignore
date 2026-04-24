@@ -1,0 +1,7 @@
+.DS_Store
+datos_entrada/
+datos_salida/
+Bonos BI/
+*.xlsx
+__pycache__/
+*.pyc
