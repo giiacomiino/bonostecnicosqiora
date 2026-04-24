@@ -1067,7 +1067,7 @@ async function loadFromSupabase(){
 // ═══════════════════════════════════════════
 // CARGA DE CONFIGURACIÓN DESDE SUPABASE
 // Lee config_distritos, config_bonos_base, config_servicios
-// y reconstruye METAS, BONOS, SERVICIOS, DESC_D en memoria.
+// y reconstruye METAS (con pen:bool), BONOS, SERVICIOS en memoria.
 // Registros vigentes = fecha_fin IS NULL.
 // ═══════════════════════════════════════════
 async function loadConfig(){
@@ -1080,14 +1080,13 @@ async function loadConfig(){
     ]);
     if(dr.error||br.error||sr.error){console.warn('loadConfig error parcial',dr.error||br.error||sr.error);return false;}
 
-    // Reconstruir METAS + DESC_D (tomar el registro más reciente por distrito)
+    // Reconstruir METAS (tomar el registro más reciente por distrito)
+    // pen:true/false vive dentro de METAS — no hay DESC_D separado
     const seenD=new Set();
-    DESC_D.clear();
     dr.data.forEach(row=>{
       if(seenD.has(row.distrito))return;
       seenD.add(row.distrito);
-      METAS[row.distrito]={t:row.tipo,N:row.meta_normal,Mo:row.meta_moto,H:row.meta_hibrida,E:row.meta_elite,Mu:row.meta_multidistrito};
-      if(row.penalizacion)DESC_D.add(row.distrito);
+      METAS[row.distrito]={t:row.tipo,N:row.meta_normal,Mo:row.meta_moto,H:row.meta_hibrida,E:row.meta_elite,Mu:row.meta_multidistrito,pen:!!row.penalizacion};
     });
 
     // Reconstruir BONOS (tomar más reciente por tipo+tramo)
@@ -1137,7 +1136,7 @@ async function persistConfigToSupabase(){
     // ── Distritos ──────────────────────────────────
     const newDist=Object.entries(METAS).map(([d,info])=>({
       distrito:d, tipo:info.t,
-      penalizacion:DESC_D.has(d),
+      penalizacion:!!METAS[d]?.pen,
       meta_normal:info.N, meta_moto:info.Mo, meta_hibrida:info.H,
       meta_elite:info.E, meta_multidistrito:info.Mu,
       fecha_inicio:today, fecha_fin:null
@@ -1264,28 +1263,28 @@ async function uploadToSupabase(techMap,filename){
 // ═══════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════
+// pen:true = distrito con esquema de penalización por inasistencias
+// Fuente de verdad única — se sobreescribe con loadConfig() si hay Supabase
 const METAS={
-  'CTA-TPI-INT-CUN CANCUN 1':       {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-VRZ VERACRUZ':       {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-TUX TUXTLA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-XAL XALAPA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-MER MERIDA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-IRA IRAPUATO':       {t:'B',N:75,Mo:60,H:75,E:75,Mu:75},
-  'CTA-TPI-INT-LON LEON':           {t:'B',N:75,Mo:70,H:75,E:75,Mu:75},
-  'CTA-TPI-INT-MOR MORELIA':        {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-PUE PUEBLA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-GBA GDL BARRANCA':   {t:'A',N:90,Mo:70,H:90,E:90,Mu:90},
-  'CTA-TPI-INT-GPR GDL PRIMAVERA':  {t:'A',N:90,Mo:60,H:90,E:90,Mu:90},
-  'CTA-TPI-INT-GES GDL ESTADIO':    {t:'A',N:90,Mo:60,H:90,E:90,Mu:90},
-  'CTA-TPI-INT-CBA CORDOBA ORIZABA':{t:'B',N:75,Mo:60,H:75,E:75,Mu:75},
-  'CTA-TPI-INT-GLM GDL LOPEZ MATEOS':{t:'A',N:75,Mo:60,H:75,E:75,Mu:75},
-  'CTA-TPI-INT-AGS AGUASCALIENTES': {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-TEP TEPIC':          {t:'B',N:84,Mo:70,H:84,E:84,Mu:84},
-  'CTA-TPI-INT-COL COLIMA':         {t:'B',N:90,Mo:70,H:90,E:90,Mu:90},
+  'CTA-TPI-INT-CUN CANCUN 1':        {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-VRZ VERACRUZ':        {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:true},
+  'CTA-TPI-INT-TUX TUXTLA':          {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-XAL XALAPA':          {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-MER MERIDA':          {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-IRA IRAPUATO':        {t:'B',N:75,Mo:60,H:75,E:75,Mu:75,pen:true},
+  'CTA-TPI-INT-LON LEON':            {t:'B',N:75,Mo:70,H:75,E:75,Mu:75,pen:true},
+  'CTA-TPI-INT-MOR MORELIA':         {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-PUE PUEBLA':          {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-GBA GDL BARRANCA':    {t:'A',N:90,Mo:70,H:90,E:90,Mu:90,pen:true},
+  'CTA-TPI-INT-GPR GDL PRIMAVERA':   {t:'A',N:90,Mo:60,H:90,E:90,Mu:90,pen:true},
+  'CTA-TPI-INT-GES GDL ESTADIO':     {t:'A',N:90,Mo:60,H:90,E:90,Mu:90,pen:true},
+  'CTA-TPI-INT-CBA CORDOBA ORIZABA': {t:'B',N:75,Mo:60,H:75,E:75,Mu:75,pen:false},
+  'CTA-TPI-INT-GLM GDL LOPEZ MATEOS':{t:'A',N:75,Mo:60,H:75,E:75,Mu:75,pen:true},
+  'CTA-TPI-INT-AGS AGUASCALIENTES':  {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-TEP TEPIC':           {t:'B',N:84,Mo:70,H:84,E:84,Mu:84,pen:false},
+  'CTA-TPI-INT-COL COLIMA':          {t:'B',N:90,Mo:70,H:90,E:90,Mu:90,pen:false},
 };
 const BONOS={A:{'80':500,'90':900,'100':2500},B:{'80':450,'90':800,'100':1800}};
-// 7 distritos con esquema de penalización por inasistencias
-const DESC_D=new Set(['CTA-TPI-INT-IRA IRAPUATO','CTA-TPI-INT-LON LEON','CTA-TPI-INT-GBA GDL BARRANCA','CTA-TPI-INT-GES GDL ESTADIO','CTA-TPI-INT-GLM GDL LOPEZ MATEOS','CTA-TPI-INT-GPR GDL PRIMAVERA','CTA-TPI-INT-VRZ VERACRUZ']);
 const SERVICIOS=[['Instalación',6],['Soporte',3],['Mantenimiento Mayor',4],['Mantenimiento',3],['Addons',2],['Cambio De Domicilio',6],['Cambio De Equipo',2],['Soporte Empresarial',5],['Instalación Empresarial',8],['Recolección Pi',1],['Recolección',1],['Cambio De Plan',2],['Factibilidad',1],['No Aplica',0]];
 
 // Calcula puntos de una orden usando la tabla SERVICIOS actual (Ajustes)
@@ -1374,12 +1373,10 @@ function bono110(pct,est,meta,t){
   return Math.min(Math.floor(Math.max(0,est-meta)/6)*100, 500);
 }
 function descuento(dist,inas,base,b110){
-  // inas = max(0, 6 - días_con_OS)  ← 1 descanso ya incluido en los 6 esperados
-  // 6 días trabajados → inas=0 → 0%
-  // 5 días trabajados → inas=1 → 50%
-  // ≤4 días trabajados → inas≥2 → 100% (pierde todo)
-  // Solo aplica en los 7 distritos con penalización activa
-  if(!DESC_D.has(dist)||inas===0)return 0;
+  // inas = max(0, 6 - días_con_OS)
+  // 6 días → inas=0 → 0% | 5 días → inas=1 → 50% | ≤4 días → inas≥2 → 100%
+  // Solo aplica si METAS[dist].pen === true
+  if(!METAS[dist]?.pen||inas===0)return 0;
   if(inas===1)return Math.round((base+b110)*0.5);
   return base+b110;
 }
@@ -2910,7 +2907,7 @@ function renderConfig(){
   }
 
   document.getElementById('tbody-config').innerHTML=Object.entries(METAS).map(([d,info])=>{
-    const hasDesc=DESC_D.has(d);
+    const hasDesc=!!info.pen;
     const tid=d.replace(/[^a-z0-9]/gi,'_');
     return `<tr>
       <td style="font-size:12px;font-weight:600;white-space:nowrap">${distShort(d)}</td>
@@ -2948,8 +2945,8 @@ function renderConfig(){
   });
 }
 
-function updateMetaTipo(dist,val){METAS[dist].t=val;}
-function updateDescD(dist,checked){if(checked)DESC_D.add(dist);else DESC_D.delete(dist);}
+function updateMetaTipo(dist,val){if(METAS[dist])METAS[dist].t=val;}
+function updateDescD(dist,checked){if(METAS[dist])METAS[dist].pen=checked;}
 
 function saveConfig(){
   // 1. Leer DOM → actualizar METAS, BONOS, SERVICIOS en memoria
