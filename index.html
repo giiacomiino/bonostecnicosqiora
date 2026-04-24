@@ -990,15 +990,16 @@ async function loadFromSupabase(){
     clearTimeout(testTimer);
     if(testResp.error)throw testResp.error;
 
-    // Fetch in pages of 5000 to avoid limits
-    let all=[], from=0, page=5000;
+    // Fetch en páginas de 1000 (límite default de Supabase)
+    let all=[], from=0, page=1000;
     while(true){
+      setSbStatus(`Cargando… ${all.length.toLocaleString()} órdenes`,null);
       const {data,error}=await _sb.from('orders').select('*').order('fecha',{ascending:true}).range(from,from+page-1);
       if(error)throw error;
       if(!data||data.length===0)break;
       all=all.concat(data);
-      if(data.length<page)break;
       from+=page;
+      if(data.length<page)break; // última página (parcial)
     }
     if(all.length===0){
       document.getElementById('week-sel').innerHTML='<option value="">Sin semanas</option>';
