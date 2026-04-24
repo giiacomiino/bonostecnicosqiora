@@ -998,7 +998,7 @@ async function loadFromSupabase(){
     let all=[], from=0, page=1000;
     while(true){
       setSbStatus(`Cargando… ${all.length.toLocaleString()} órdenes`,null);
-      const {data,error}=await _sb.from('orders').select('*').order('fecha',{ascending:true}).range(from,from+page-1);
+      const {data,error}=await _sb.from('orders').select('*').range(from,from+page-1);
       if(error)throw error;
       if(!data||data.length===0)break;
       all=all.concat(data);
