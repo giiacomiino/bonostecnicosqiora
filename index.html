@@ -357,6 +357,10 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
         <option value="Elite">Elite</option>
         <option value="Multidistrito">Multidistrito</option>
       </select>
+      <button onclick="openExportModal()" title="Exportar datos con filtros activos" style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;border:1.5px solid #E5E7EB;background:white;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='var(--or)';this.style.color='var(--or)'" onmouseout="this.style.borderColor='#E5E7EB';this.style.color='var(--text2)'">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Exportar
+      </button>
       <div class="icon-btn">
         <svg viewBox="0 0 24 24" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
         <span class="notif-dot"></span>
@@ -3650,6 +3654,164 @@ function renderDrillTable(grp,tier,ti){
 }
 
 // ═══════════════════════════════════════════
+// EXPORTACIÓN DE DATOS
+// ═══════════════════════════════════════════
+let _expCtx={};
+const _MNS_EXP=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function openExportModal(){
+  const data=window._allRealData||allData;
+  if(!data||!data.length){alert('Carga los datos primero para poder exportar.');return;}
+
+  // ─── Detectar contexto de la vista activa ────────────────────────────────
+  const viewId=document.querySelector('.view.active')?.id?.replace('view-','') || 'nacional';
+  const skill=document.getElementById('skill-filter')?.value || '';
+  _expCtx={view:viewId, skill, distrito:null, coordId:null, tecId:null};
+
+  const VIEW_LABELS={nacional:'Vista Nacional',distritos:'Vista Distritos',coordinadores:'Vista Coordinadores',tecnicos:'Vista Técnicos',calculo:'Cálculo de Bonos',ajustes:'Ajustes'};
+  let titleExtra='';
+
+  if(viewId==='distritos'&&selDistrito){
+    _expCtx.distrito=selDistrito;
+    titleExtra=' — '+distShort(selDistrito);
+  } else if(viewId==='coordinadores'&&selCoord){
+    _expCtx.coordId=selCoord;
+    const coord=coordData.find(c=>c.id===selCoord);
+    titleExtra=' — '+(coord?.nombre||'Coordinador');
+  } else if(viewId==='tecnicos'&&selTecnico){
+    _expCtx.tecId=selTecnico;
+    const tec=data.find(t=>t.id===selTecnico);
+    titleExtra=' — '+(tec?.nombre||selTecnico);
+  }
+
+  document.getElementById('exp-title').textContent='Exportar Datos'+titleExtra;
+  document.getElementById('exp-subtitle').textContent=VIEW_LABELS[viewId]||viewId;
+
+  // ─── Etiquetas de filtros activos ─────────────────────────────────────────
+  const tags=[];
+  const chip=(txt,bg,col)=>`<span style="background:${bg};color:${col};padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600">${txt}</span>`;
+  if(_expCtx.distrito)tags.push(chip('📍 '+distShort(_expCtx.distrito),'#FFF3E0','var(--or)'));
+  if(_expCtx.coordId){const c=coordData.find(c=>c.id===_expCtx.coordId);tags.push(chip('👤 '+(c?.nombre||_expCtx.coordId),'#EEF2FF','#4F46E5'));}
+  if(_expCtx.tecId){const t=data.find(t=>t.id===_expCtx.tecId);tags.push(chip('🔧 '+(t?.nombre||_expCtx.tecId),'#F0FDF4','#16A34A'));}
+  if(skill)tags.push(chip('⚙️ Cuadrilla: '+skill,'#F0FDF4','#16A34A'));
+  if(!tags.length)tags.push('<span style="font-size:11px;color:var(--text3)">Ninguno — se exporta todo según la vista</span>');
+  document.getElementById('exp-filters').innerHTML=tags.join('');
+
+  // ─── Selectores de semana ─────────────────────────────────────────────────
+  const allWks=window._realWeeks||[...new Set((data).map(t=>t.semana).filter(Boolean))].sort();
+  const fmtWk=wk=>{if(!wk)return '';const m=getMondayOfWeek(new Date(wk+'T12:00:00'));return `${m.getDate()} ${_MNS_EXP[m.getMonth()]} ${m.getFullYear()}`;};
+  const opts=allWks.map(wk=>`<option value="${wk}">Sem ${fmtWk(wk)}</option>`).join('');
+  document.getElementById('exp-from').innerHTML=opts;
+  document.getElementById('exp-to').innerHTML=opts;
+
+  // Default: hasta = semana seleccionada, desde = 10 semanas antes
+  const curWk=window._currentRealWk||allWks[allWks.length-1];
+  const toIdx=curWk?allWks.indexOf(curWk):allWks.length-1;
+  const fromIdx=Math.max(0,toIdx-9);
+  if(allWks[fromIdx])document.getElementById('exp-from').value=allWks[fromIdx];
+  if(allWks[toIdx>=0?toIdx:allWks.length-1])document.getElementById('exp-to').value=allWks[toIdx>=0?toIdx:allWks.length-1];
+
+  updateExportPreview();
+  document.getElementById('export-modal').style.display='flex';
+}
+
+function updateExportPreview(){
+  const from=document.getElementById('exp-from').value;
+  const to=document.getElementById('exp-to').value;
+  if(from>to){
+    document.getElementById('exp-preview').innerHTML='<span style="color:var(--red)">⚠ La fecha de inicio debe ser anterior a la de fin</span>';
+    return;
+  }
+  const n=getExportRows(from,to).length;
+  document.getElementById('exp-preview').textContent=`${n.toLocaleString('es-MX')} registros a exportar`;
+}
+
+function getExportRows(from,to){
+  const data=window._allRealData||allData;
+  const {skill,distrito,coordId,tecId}=_expCtx;
+  return data.filter(t=>{
+    if(!t.semana||t.semana<from||t.semana>to)return false;
+    if(skill&&t.skill!==skill)return false;
+    if(distrito&&t.distrito!==distrito)return false;
+    if(coordId&&t.coordId!==coordId)return false;
+    if(tecId&&t.id!==tecId)return false;
+    return true;
+  });
+}
+
+function doExport(){
+  const from=document.getElementById('exp-from').value;
+  const to=document.getElementById('exp-to').value;
+  if(from>to){alert('La fecha de inicio debe ser anterior a la de fin.');return;}
+  const fmt=document.querySelector('input[name="exp-fmt"]:checked')?.value||'xlsx';
+  const rows=getExportRows(from,to);
+  if(!rows.length){alert('No hay datos para el rango seleccionado con los filtros activos.');return;}
+
+  // ─── Construir filas ──────────────────────────────────────────────────────
+  const headers=['Semana','FFM','Nombre','Distrito','Coordinador','Cuadrilla',
+    'Meta (⭐)','Estrellas','% Alcance','Órdenes','Días Trabajados','Inasistencias',
+    'Bono Base ($)','Bono 110%+ ($)','Descuento ($)','Bono Neto ($)'];
+
+  const sheetRows=rows.map(t=>[
+    t.semana,
+    t.id.replace('TEC-R-',''),
+    t.nombre,
+    distShort(t.distrito),
+    t.coordNombre||'—',
+    t.skill||'—',
+    t.meta,
+    Math.round(t.estrellas),
+    +t.pct.toFixed(1),
+    t.nOrdenes,
+    t.dias,
+    t.inas,
+    t.bonoBase,
+    t.bono110,
+    t.descuento,
+    t.bonoFinal
+  ]);
+
+  // ─── Nombre del archivo ───────────────────────────────────────────────────
+  const {distrito,coordId,tecId,view}=_expCtx;
+  const ctxStr=distrito?distShort(distrito).replace(/\s+/g,'_'):
+                coordId?(coordData.find(c=>c.id===coordId)?.nombre||'coord').replace(/\s+/g,'_'):
+                tecId?(window._allRealData||allData).find(t=>t.id===tecId)?.nombre?.replace(/\s+/g,'_')||'tec':
+                view;
+  const filename=`QiORA_Bonos_${ctxStr}_${from}_${to}`;
+
+  if(fmt==='csv'){
+    const csv=[headers,...sheetRows].map(row=>
+      row.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')
+    ).join('\n');
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=filename+'.csv';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  } else {
+    const ws=XLSX.utils.aoa_to_sheet([headers,...sheetRows]);
+    ws['!cols']=[{wch:12},{wch:14},{wch:24},{wch:22},{wch:22},{wch:13},
+                 {wch:10},{wch:10},{wch:10},{wch:9},{wch:13},{wch:13},
+                 {wch:14},{wch:14},{wch:14},{wch:14}];
+    // Fila de totales al final
+    const nR=sheetRows.length;
+    const totRow=['TOTAL','','','','','','','',''
+      ,sheetRows.reduce((s,r)=>s+(r[9]||0),0)
+      ,'',''
+      ,sheetRows.reduce((s,r)=>s+(r[12]||0),0)
+      ,sheetRows.reduce((s,r)=>s+(r[13]||0),0)
+      ,sheetRows.reduce((s,r)=>s+(r[14]||0),0)
+      ,sheetRows.reduce((s,r)=>s+(r[15]||0),0)];
+    XLSX.utils.sheet_add_aoa(ws,[totRow],{origin:nR+1});
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Bonos');
+    XLSX.writeFile(wb,filename+'.xlsx');
+  }
+
+  document.getElementById('export-modal').style.display='none';
+}
+
+// ═══════════════════════════════════════════
 // INIT — sin datos falsos; todo viene de Supabase
 // ═══════════════════════════════════════════
 allData=[];
@@ -3658,6 +3820,64 @@ renderNacional();
 renderConfig();
 loadFromSupabase();
 </script>
+
+<!-- MODAL: Exportar datos -->
+<div id="export-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:24px">
+  <div style="background:white;border-radius:14px;width:min(500px,95vw);box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">
+    <!-- Header -->
+    <div style="padding:20px 22px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between">
+      <div>
+        <div style="font-size:15px;font-weight:800;color:var(--text)" id="exp-title">Exportar Datos</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px" id="exp-subtitle"></div>
+      </div>
+      <button onclick="document.getElementById('export-modal').style.display='none'" style="width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:white;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <!-- Body -->
+    <div style="padding:20px 22px">
+      <!-- Filtros activos -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.05em;margin-bottom:6px">FILTROS ACTIVOS</div>
+        <div id="exp-filters" style="display:flex;flex-wrap:wrap;gap:6px;min-height:24px"></div>
+      </div>
+      <!-- Rango de semanas -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.05em;margin-bottom:8px">RANGO DE SEMANAS</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px">Desde</div>
+            <select class="fs" id="exp-from" onchange="updateExportPreview()" style="width:100%"></select>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px">Hasta</div>
+            <select class="fs" id="exp-to" onchange="updateExportPreview()" style="width:100%"></select>
+          </div>
+        </div>
+      </div>
+      <!-- Formato -->
+      <div style="margin-bottom:18px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.05em;margin-bottom:8px">FORMATO</div>
+        <div style="display:flex;gap:14px">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500">
+            <input type="radio" name="exp-fmt" value="xlsx" checked style="accent-color:var(--or)"> Excel (.xlsx)
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500">
+            <input type="radio" name="exp-fmt" value="csv" style="accent-color:var(--or)"> CSV (.csv)
+          </label>
+        </div>
+      </div>
+      <!-- Preview -->
+      <div id="exp-preview" style="font-size:11px;color:var(--text3);margin-bottom:4px;min-height:16px"></div>
+    </div>
+    <!-- Footer -->
+    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;background:#FAFAFA">
+      <button onclick="document.getElementById('export-modal').style.display='none'" style="padding:8px 16px;border-radius:8px;border:1.5px solid #E5E7EB;background:white;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2)">Cancelar</button>
+      <button onclick="doExport()" style="padding:8px 20px;border-radius:8px;border:none;background:var(--or);color:white;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px">
+        <svg width="13" height="13" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: Desglose por bracket de alcance -->
 <div id="tier-drill-overlay" onclick="if(event.target===this)closeTierDrill()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:24px">
