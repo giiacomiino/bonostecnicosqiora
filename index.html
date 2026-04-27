@@ -2626,51 +2626,75 @@ function renderFicha(t){
       </div>
     </div>`;
 
-  // Histórico bonos — etiquetas reales de semanas
+  // Histórico bonos — últimas 10 semanas hasta la semana seleccionada, bono neto real
   const MNS3=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  let weeks=window._realWeeks
-    ?window._realWeeks.slice(-10).map(wk=>{const m=getMondayOfWeek(new Date(wk+'T12:00:00'));return `${m.getDate()} ${MNS3[m.getMonth()]}`;})
+  const upToSem=t.semana||(window._realWeeks&&window._realWeeks[window._realWeeks.length-1]);
+  const last10wks=window._realWeeks
+    ?window._realWeeks.filter(wk=>wk<=upToSem).slice(-10)
     :[];
-  while(weeks.length<10)weeks.unshift('');
-  weeks.splice(10);
+  let weeks=last10wks.map(wk=>{const m=getMondayOfWeek(new Date(wk+'T12:00:00'));return `${m.getDate()} ${MNS3[m.getMonth()]}`;});
+  while(weeks.length<10)weeks.unshift('');weeks.splice(10);
+  // Datos: bonoFinal real por semana desde _allRealData
+  let histData;
+  if(window._allRealData&&t.semana){
+    const techByWk={};
+    window._allRealData.filter(r=>r.id===t.id).forEach(r=>{techByWk[r.semana]=r.bonoFinal;});
+    histData=last10wks.map(wk=>techByWk[wk]||0);
+    while(histData.length<10)histData.unshift(0);histData.splice(10);
+  } else {
+    histData=t.historial;
+  }
   if(chartHistorico)chartHistorico.destroy();
   chartHistorico=new Chart(document.getElementById('chart-historico'),{
     type:'line',
-    data:{labels:weeks,datasets:[{data:t.historial,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.4,pointBackgroundColor:'#E85420',pointRadius:4,pointHoverRadius:6,borderWidth:2.5,label:'Bonificación ($)'}]},
+    data:{labels:weeks,datasets:[{data:histData,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.4,pointBackgroundColor:'#E85420',pointRadius:4,pointHoverRadius:6,borderWidth:2.5,label:'Bonificación ($)'}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}}}}
   });
 
-  // Heatmap — muestra el mes del periodo seleccionado
+  // Heatmap — 5 semanas terminando en la semana seleccionada
   document.getElementById('day-detail-panel').style.display='none';
   const MS_DAY=86400000;
-  const hmDataStart=window._hmStart?new Date(window._hmStart):new Date();
-  hmDataStart.setHours(0,0,0,0);
-  const calBase=window._calMonthStart||getCalMonthStart(hmDataStart);
+
+  // calBase = lunes de la semana seleccionada − 4 semanas (inicio de la ventana de 5)
+  let calBase;
+  if(t.semana){
+    const techMon=getMondayOfWeek(new Date(t.semana+'T12:00:00'));
+    calBase=new Date(techMon);
+    calBase.setDate(calBase.getDate()-28);
+  } else {
+    const hmDataStart=window._hmStart?new Date(window._hmStart):new Date();
+    hmDataStart.setHours(0,0,0,0);
+    calBase=getCalMonthStart(hmDataStart);
+  }
 
   // ── Construir curOBD (orders by calDi) ──────────────────────────────────────
-  // calDi = 0-34 relativo a calBase (independiente de _hmStart)
   const curOBD={};
   if(t.semana){
-    // Datos reales: t.semOrders tiene o.dia (string YYYY-MM-DD) y o.fecha (Date)
-    (t.semOrders||[]).forEach(o=>{
-      if(!o.dia)return;
-      const dDate=new Date(o.dia+'T12:00:00');
-      const calDi=Math.round((dDate.getTime()-calBase.getTime())/MS_DAY);
-      if(calDi>=0&&calDi<35){
-        if(!curOBD[calDi])curOBD[calDi]=[];
-        const fd=o.fecha instanceof Date?o.fecha:new Date(o.dia+'T00:00:00');
-        curOBD[calDi].push({
-          os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,
-          estrellas:o.puntos||svcPoints(o.tipo),
-          hora:fd instanceof Date&&!isNaN(fd)?fd.toTimeString().slice(0,5):'—'
-        });
-      }
+    // Recolectar órdenes de las 5 semanas visibles desde _allRealData
+    const techRecords=window._allRealData
+      ?window._allRealData.filter(r=>r.id===t.id)
+      :[t];
+    techRecords.forEach(rec=>{
+      (rec.semOrders||[]).forEach(o=>{
+        if(!o.dia)return;
+        const dDate=new Date(o.dia+'T12:00:00');
+        const calDi=Math.round((dDate.getTime()-calBase.getTime())/MS_DAY);
+        if(calDi>=0&&calDi<35){
+          if(!curOBD[calDi])curOBD[calDi]=[];
+          const fd=o.fecha instanceof Date?o.fecha:new Date(o.dia+'T00:00:00');
+          curOBD[calDi].push({
+            os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,
+            estrellas:o.puntos||svcPoints(o.tipo),
+            hora:fd instanceof Date&&!isNaN(fd)?fd.toTimeString().slice(0,5):'—'
+          });
+        }
+      });
     });
-    // Ordenar por hora dentro de cada día
     Object.values(curOBD).forEach(arr=>arr.sort((a,b)=>a.hora.localeCompare(b.hora)));
   } else {
-    // Datos simulados: ordersByDay ya indexado relativo a hmDataStart (~calBase)
+    const hmDataStart=window._hmStart?new Date(window._hmStart):new Date();
+    hmDataStart.setHours(0,0,0,0);
     const offset=Math.round((hmDataStart.getTime()-calBase.getTime())/MS_DAY);
     Object.entries(t.ordersByDay||{}).forEach(([di,orders])=>{
       const calDi=parseInt(di)+offset;
@@ -2684,15 +2708,18 @@ function renderFicha(t){
   if(t.semana){
     // Marcar 'p' donde hay órdenes
     Object.keys(curOBD).forEach(di=>{calAsist[parseInt(di)]='p';});
-    // Determinar qué semana del calendario es la semana activa del técnico
-    const techMon=getMondayOfWeek(new Date(t.semana+'T12:00:00'));
-    const techCalDi=Math.round((techMon.getTime()-calBase.getTime())/MS_DAY);
-    const activeWk=Math.floor(techCalDi/7); // 0-4
-    // En la semana activa: días sin órdenes → resolver descanso/falta
-    if(activeWk>=0&&activeWk<5){
+    // Por cada semana visible: si hay actividad, resolver descanso (1 día) vs falta
+    for(let wk=0;wk<5;wk++){
+      const wkMon=new Date(calBase);wkMon.setDate(wkMon.getDate()+wk*7);
+      const wkStr=wkMon.getFullYear()+'-'+String(wkMon.getMonth()+1).padStart(2,'0')+'-'+String(wkMon.getDate()).padStart(2,'0');
+      // ¿Hay un registro para esta semana en _allRealData?
+      const hasActivity=window._allRealData
+        ?window._allRealData.some(r=>r.id===t.id&&r.semana===wkStr)
+        :t.semana===wkStr;
+      if(!hasActivity)continue; // semana sin datos → todo 'r' (ya es default)
       const noOsDays=[];
       for(let d=0;d<7;d++){
-        const di=activeWk*7+d;
+        const di=wk*7+d;
         if(calAsist[di]!=='p')noOsDays.push(di);
       }
       if(noOsDays.length===1){calAsist[noOsDays[0]]='r';}
@@ -2702,7 +2729,8 @@ function renderFicha(t){
       }
     }
   } else {
-    // Datos simulados: reindexar t.asistencia
+    const hmDataStart=window._hmStart?new Date(window._hmStart):new Date();
+    hmDataStart.setHours(0,0,0,0);
     const offset=Math.round((hmDataStart.getTime()-calBase.getTime())/MS_DAY);
     (t.asistencia||[]).forEach((v,di)=>{
       const calDi=di+offset;
@@ -2713,8 +2741,8 @@ function renderFicha(t){
   // ── Renderizar ───────────────────────────────────────────────────────────────
   const WDYS=['L','M','X','J','V','S','D'];
   const MNS4=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const calMonth=new Date(calBase);calMonth.setDate(calMonth.getDate()+6);
-  const mesNombre=`${MNS4[calMonth.getMonth()]} ${calMonth.getFullYear()}`;
+  const calEnd=new Date(calBase);calEnd.setDate(calEnd.getDate()+34);
+  const mesNombre=`${MNS4[calBase.getMonth()]} ${calBase.getFullYear()}${calBase.getMonth()!==calEnd.getMonth()?` – ${MNS4[calEnd.getMonth()]} ${calEnd.getFullYear()}`:''}  (5 semanas)`;
   let hmHtml=`<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">${mesNombre}</div>`;
   hmHtml+=`<div style="display:flex;margin-bottom:5px;align-items:center">
     <div style="width:52px;flex-shrink:0"></div>
@@ -3303,10 +3331,16 @@ function rebuildFromRawOrders(){
     const meta    =metaInfo[skKey]||metaInfo.N||84;
     const tipoDist=metaInfo.t||'B';
 
-    // Historial de bonos base por semana (gráfica técnico)
+    // Historial de bonos netos por semana (gráfica técnico)
     const histAll=allWeeks.map(wk=>{
       const wd=byWk[wk];if(!wd)return 0;
-      return Math.max(0,bonoBase(wd.puntos/meta*100,tipoDist));
+      const pctH=meta>0?(wd.puntos/meta*100):0;
+      const diasH=wd.diasSet.size;
+      const inasH=Math.max(0,6-diasH);
+      const bbH=bonoBase(pctH,tipoDist);
+      const b11H=bono110(pctH,wd.puntos,meta,tipoDist);
+      const descH=descuento(tech.dist,inasH,bbH,b11H);
+      return Math.max(0,Math.min(bbH+b11H-descH,BONO_CAP));
     });
     while(histAll.length<10)histAll.unshift(0);histAll.splice(10);
 
