@@ -3722,8 +3722,17 @@ function updateExportPreview(){
     document.getElementById('exp-preview').innerHTML='<span style="color:var(--red)">⚠ La fecha de inicio debe ser anterior a la de fin</span>';
     return;
   }
-  const n=getExportRows(from,to).length;
-  document.getElementById('exp-preview').textContent=`${n.toLocaleString('es-MX')} registros a exportar`;
+  const level=document.querySelector('input[name="exp-level"]:checked')?.value||'resumen';
+  // Highlight selected level card
+  document.getElementById('exp-lv1-lbl').style.borderColor=level==='resumen'?'var(--or)':'#E5E7EB';
+  document.getElementById('exp-lv2-lbl').style.borderColor=level==='detalle'?'var(--or)':'#E5E7EB';
+  if(level==='detalle'){
+    const n=getExportRowsDetailed(from,to).length;
+    document.getElementById('exp-preview').textContent=`${n.toLocaleString('es-MX')} órdenes de servicio a exportar`;
+  } else {
+    const n=getExportRows(from,to).length;
+    document.getElementById('exp-preview').textContent=`${n.toLocaleString('es-MX')} registros (técnico/semana) a exportar`;
+  }
 }
 
 function getExportRows(from,to){
@@ -3739,45 +3748,132 @@ function getExportRows(from,to){
   });
 }
 
+function getExportRowsDetailed(from,to){
+  const {skill,distrito,coordId,tecId}=_expCtx;
+  const recData=window._allRealData||allData;
+  const DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const rows=[];
+
+  // Construir índice de semana → registro de técnico para contexto de bono
+  const wkIndex={};
+  recData.forEach(r=>{
+    const key=r.id+'|'+r.semana;
+    wkIndex[key]=r;
+  });
+
+  // Iterar técnicos desde _techMap (datos crudos) si está disponible
+  const techEntries=window._techMap?Object.values(window._techMap):null;
+
+  if(techEntries){
+    techEntries.forEach(tech=>{
+      if(skill&&tech.skill!==skill)return;
+      if(distrito&&tech.dist!==distrito)return;
+      const techId='TEC-R-'+tech.ffm;
+      if(tecId&&techId!==tecId)return;
+      // Filtro por coordinador: buscar en recData
+      if(coordId&&!recData.some(r=>r.id===techId&&r.coordId===coordId))return;
+
+      // Ordenar órdenes por fecha
+      const orders=[...tech.orders].sort((a,b)=>a.fecha-b.fecha);
+      orders.forEach(o=>{
+        if(!o.wk||o.wk<from||o.wk>to)return;
+        const rec=wkIndex[techId+'|'+o.wk];
+        const fecha=o.fecha instanceof Date?o.fecha:new Date(o.dia+'T00:00:00');
+        const diaSem=!isNaN(fecha.getTime())?DIAS[fecha.getDay()]:'—';
+        rows.push([
+          o.wk,
+          o.dia,
+          diaSem,
+          tech.ffm,
+          tech.nombre,
+          distShort(tech.dist),
+          rec?.coordNombre||tech.coord||'—',
+          tech.skill||'—',
+          o.os||'—',
+          o.ot||'—',
+          o.tipo||'—',
+          svcPoints(o.tipo),
+          // Contexto semana
+          rec?.meta||'—',
+          rec?Math.round(rec.estrellas):'—',
+          rec?+rec.pct.toFixed(1):'—',
+          rec?.dias||'—',
+          rec?.inas||'—',
+          rec?.bonoBase||0,
+          rec?.bono110||0,
+          rec?.descuento||0,
+          rec?.bonoFinal||0,
+        ]);
+      });
+    });
+  } else {
+    // Fallback: extraer de semOrders de _allRealData
+    recData.forEach(t=>{
+      if(!t.semana||t.semana<from||t.semana>to)return;
+      if(skill&&t.skill!==skill)return;
+      if(distrito&&t.distrito!==distrito)return;
+      if(coordId&&t.coordId!==coordId)return;
+      if(tecId&&t.id!==tecId)return;
+      (t.semOrders||[]).forEach(o=>{
+        const fecha=o.fecha instanceof Date?o.fecha:new Date((o.dia||t.semana)+'T00:00:00');
+        const diaSem=!isNaN(fecha.getTime())?DIAS[fecha.getDay()]:'—';
+        rows.push([
+          t.semana,o.dia||'—',diaSem,
+          t.id.replace('TEC-R-',''),t.nombre,distShort(t.distrito),
+          t.coordNombre||'—',t.skill||'—',
+          o.os||'—',o.ot||'—',o.tipo||'—',o.puntos||svcPoints(o.tipo),
+          t.meta,Math.round(t.estrellas),+t.pct.toFixed(1),
+          t.dias,t.inas,t.bonoBase,t.bono110,t.descuento,t.bonoFinal,
+        ]);
+      });
+    });
+  }
+  return rows;
+}
+
 function doExport(){
   const from=document.getElementById('exp-from').value;
   const to=document.getElementById('exp-to').value;
   if(from>to){alert('La fecha de inicio debe ser anterior a la de fin.');return;}
   const fmt=document.querySelector('input[name="exp-fmt"]:checked')?.value||'xlsx';
-  const rows=getExportRows(from,to);
-  if(!rows.length){alert('No hay datos para el rango seleccionado con los filtros activos.');return;}
-
-  // ─── Construir filas ──────────────────────────────────────────────────────
-  const headers=['Semana','FFM','Nombre','Distrito','Coordinador','Cuadrilla',
-    'Meta (⭐)','Estrellas','% Alcance','Órdenes','Días Trabajados','Inasistencias',
-    'Bono Base ($)','Bono 110%+ ($)','Descuento ($)','Bono Neto ($)'];
-
-  const sheetRows=rows.map(t=>[
-    t.semana,
-    t.id.replace('TEC-R-',''),
-    t.nombre,
-    distShort(t.distrito),
-    t.coordNombre||'—',
-    t.skill||'—',
-    t.meta,
-    Math.round(t.estrellas),
-    +t.pct.toFixed(1),
-    t.nOrdenes,
-    t.dias,
-    t.inas,
-    t.bonoBase,
-    t.bono110,
-    t.descuento,
-    t.bonoFinal
-  ]);
+  const level=document.querySelector('input[name="exp-level"]:checked')?.value||'resumen';
 
   // ─── Nombre del archivo ───────────────────────────────────────────────────
   const {distrito,coordId,tecId,view}=_expCtx;
-  const ctxStr=distrito?distShort(distrito).replace(/\s+/g,'_'):
-                coordId?(coordData.find(c=>c.id===coordId)?.nombre||'coord').replace(/\s+/g,'_'):
-                tecId?(window._allRealData||allData).find(t=>t.id===tecId)?.nombre?.replace(/\s+/g,'_')||'tec':
-                view;
-  const filename=`QiORA_Bonos_${ctxStr}_${from}_${to}`;
+  const ctxStr=(distrito?distShort(distrito):
+                coordId?(coordData.find(c=>c.id===coordId)?.nombre||'coord'):
+                tecId?((window._allRealData||allData).find(t=>t.id===tecId)?.nombre||'tec'):
+                view).replace(/[\s/\\:*?"<>|]+/g,'_');
+  const suffix=level==='detalle'?'_detalle':'';
+  const filename=`QiORA_Bonos_${ctxStr}${suffix}_${from}_${to}`;
+
+  let headers, sheetRows;
+
+  if(level==='detalle'){
+    sheetRows=getExportRowsDetailed(from,to);
+    if(!sheetRows.length){alert('No hay órdenes para el rango seleccionado con los filtros activos.');return;}
+    headers=[
+      'Semana (lunes)','Fecha','Día',
+      'FFM','Nombre','Distrito','Coordinador','Cuadrilla',
+      'Núm. OS','Núm. OT','Tipo de Servicio','Estrellas OS',
+      // Contexto de la semana (se repite por cada OS de esa semana)
+      'Meta Semana (⭐)','Total ⭐ Semana','% Alcance Semana',
+      'Días Trabajados','Inasistencias',
+      'Bono Base ($)','Bono 110%+ ($)','Descuento ($)','Bono Neto ($)',
+    ];
+  } else {
+    const summaryRecs=getExportRows(from,to);
+    if(!summaryRecs.length){alert('No hay datos para el rango seleccionado con los filtros activos.');return;}
+    headers=['Semana','FFM','Nombre','Distrito','Coordinador','Cuadrilla',
+      'Meta (⭐)','Estrellas','% Alcance','Órdenes','Días Trabajados','Inasistencias',
+      'Bono Base ($)','Bono 110%+ ($)','Descuento ($)','Bono Neto ($)'];
+    sheetRows=summaryRecs.map(t=>[
+      t.semana,t.id.replace('TEC-R-',''),t.nombre,distShort(t.distrito),
+      t.coordNombre||'—',t.skill||'—',t.meta,Math.round(t.estrellas),
+      +t.pct.toFixed(1),t.nOrdenes,t.dias,t.inas,
+      t.bonoBase,t.bono110,t.descuento,t.bonoFinal,
+    ]);
+  }
 
   if(fmt==='csv'){
     const csv=[headers,...sheetRows].map(row=>
@@ -3790,21 +3886,25 @@ function doExport(){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
   } else {
     const ws=XLSX.utils.aoa_to_sheet([headers,...sheetRows]);
-    ws['!cols']=[{wch:12},{wch:14},{wch:24},{wch:22},{wch:22},{wch:13},
-                 {wch:10},{wch:10},{wch:10},{wch:9},{wch:13},{wch:13},
-                 {wch:14},{wch:14},{wch:14},{wch:14}];
-    // Fila de totales al final
-    const nR=sheetRows.length;
-    const totRow=['TOTAL','','','','','','','',''
-      ,sheetRows.reduce((s,r)=>s+(r[9]||0),0)
-      ,'',''
-      ,sheetRows.reduce((s,r)=>s+(r[12]||0),0)
-      ,sheetRows.reduce((s,r)=>s+(r[13]||0),0)
-      ,sheetRows.reduce((s,r)=>s+(r[14]||0),0)
-      ,sheetRows.reduce((s,r)=>s+(r[15]||0),0)];
-    XLSX.utils.sheet_add_aoa(ws,[totRow],{origin:nR+1});
+    // Anchos de columna según nivel
+    if(level==='detalle'){
+      ws['!cols']=[{wch:12},{wch:11},{wch:6},{wch:14},{wch:24},{wch:22},{wch:22},{wch:13},
+                   {wch:14},{wch:14},{wch:22},{wch:10},
+                   {wch:13},{wch:13},{wch:13},{wch:11},{wch:11},
+                   {wch:13},{wch:13},{wch:13},{wch:13}];
+    } else {
+      ws['!cols']=[{wch:12},{wch:14},{wch:24},{wch:22},{wch:22},{wch:13},
+                   {wch:10},{wch:10},{wch:10},{wch:9},{wch:13},{wch:13},
+                   {wch:14},{wch:14},{wch:14},{wch:14}];
+      // Fila de totales solo en resumen
+      const nR=sheetRows.length;
+      const S=(ci)=>sheetRows.reduce((s,r)=>s+(+r[ci]||0),0);
+      const totRow=['TOTAL','','','','','','','',''
+        ,S(9),'','',S(12),S(13),S(14),S(15)];
+      XLSX.utils.sheet_add_aoa(ws,[totRow],{origin:nR+1});
+    }
     const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,ws,'Bonos');
+    XLSX.utils.book_append_sheet(wb,ws,level==='detalle'?'Detalle OS':'Bonos');
     XLSX.writeFile(wb,filename+'.xlsx');
   }
 
@@ -3851,6 +3951,26 @@ loadFromSupabase();
             <div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px">Hasta</div>
             <select class="fs" id="exp-to" onchange="updateExportPreview()" style="width:100%"></select>
           </div>
+        </div>
+      </div>
+      <!-- Nivel de detalle -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.05em;margin-bottom:8px">NIVEL DE DETALLE</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:9px 12px;border-radius:8px;border:1.5px solid #E5E7EB;transition:border-color .15s" id="exp-lv1-lbl">
+            <input type="radio" name="exp-level" value="resumen" checked style="accent-color:var(--or);margin-top:2px" onchange="updateExportPreview()">
+            <div>
+              <div style="font-size:12px;font-weight:700">Resumen por técnico / semana</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:1px">Una fila por técnico por semana — meta, estrellas, bono neto</div>
+            </div>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:9px 12px;border-radius:8px;border:1.5px solid #E5E7EB;transition:border-color .15s" id="exp-lv2-lbl">
+            <input type="radio" name="exp-level" value="detalle" style="accent-color:var(--or);margin-top:2px" onchange="updateExportPreview()">
+            <div>
+              <div style="font-size:12px;font-weight:700">Detalle por orden de servicio <span style="background:#FFF3E0;color:var(--or);font-size:10px;padding:1px 6px;border-radius:4px;margin-left:4px">AUDITORÍA</span></div>
+              <div style="font-size:11px;color:var(--text3);margin-top:1px">Una fila por OS — fecha, día, tipo, estrellas + contexto de bono de esa semana</div>
+            </div>
+          </label>
         </div>
       </div>
       <!-- Formato -->
