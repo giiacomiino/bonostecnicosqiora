@@ -1589,15 +1589,22 @@ function generateData(wk){
 // ═══════════════════════════════════════════
 // FORMATTERS
 // ═══════════════════════════════════════════
+// Número completo con separador de miles — para tablas, tooltips y ejes de gráficas
 const f$=n=>{
   if(n===null||n===undefined||isNaN(n))return '$0';
   const abs=Math.abs(n),sign=n<0?'−':'';
-  if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(1).replace(/\.0$/,'')+'M';
-  if(abs>=1e3)return sign+'$'+(abs/1e3).toFixed(1).replace(/\.0$/,'')+'k';
-  return sign+'$'+Math.round(abs);
+  return sign+'$'+Math.round(abs).toLocaleString('es-MX');
 };
 const fM=n=>f$(n);
 const fk=n=>f$(n);
+// Formato compacto con 2 decimales — solo para KPI bubbles grandes
+const fBubble=n=>{
+  if(!n&&n!==0)return '$0';
+  const abs=Math.abs(n),sign=n<0?'−':'';
+  if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(2)+'M';
+  if(abs>=1e3)return sign+'$'+(abs/1e3).toFixed(2)+'k';
+  return sign+'$'+Math.round(abs);
+};
 const fp=n=>n.toFixed(1)+'%';
 const distShort=d=>d.replace('CTA-TPI-INT-','');
 function initials(n){const p=n.split(' ');return((p[0]||'')[0]+(p[1]||'')[0]).toUpperCase();}
@@ -1669,7 +1676,7 @@ function renderNacional(){
 
   document.getElementById('kpi-nacional').innerHTML=`
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)"><svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>MONTO TOTAL BONOS</div>
-      <div class="kpi-val or">${fk(totalBonos)}</div>
+      <div class="kpi-val or">${fBubble(totalBonos)}</div>
       <div class="kpi-sub" style="color:var(--text3)">${total} técnicos en período</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>CUADRILLAS ACTIVAS</div>
@@ -2078,7 +2085,7 @@ function renderDistDetail(d){
       <div class="kpi-val ${lmColor}">${avgPct}%</div>
       <span class="status-tag ${lmStatus}">${lmMsg}</span></div>
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">MONTO BONOS DISTRITO</div>
-      <div class="kpi-val or">${fk(totalB)}</div>
+      <div class="kpi-val or">${fBubble(totalB)}</div>
       <div class="kpi-sub">${total} técnicos</div></div>
     <div class="kpi-c green-top"><div class="kpi-label">CUADRILLAS ACTIVAS</div>
       <div class="kpi-val gr">${activas}</div>
@@ -2428,7 +2435,7 @@ function renderCoordDetail(coord){
       <div class="kpi-val or">${prodProm}</div>
       <div class="kpi-sub">OS / cuadrilla / día</div></div>
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">TOTAL BONOS EQUIPO</div>
-      <div class="kpi-val or">${fk(tendBono)}</div>
+      <div class="kpi-val or">${fBubble(tendBono)}</div>
       <div class="kpi-sub">${total} técnicos en equipo</div></div>`;
 
   // Pirámide — OS reales por tipo de servicio del coordinador
@@ -2706,7 +2713,7 @@ function renderFicha(t){
       <div class="kpi-sub">${t.inas>0?`<span style="color:var(--red)">${t.inas} inasistencia(s)</span>`:'Sin inasistencias'}</div></div>
 
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">BONO NETO FINAL</div>
-      <div class="kpi-val or">${f$(t.bonoFinal)}</div>
+      <div class="kpi-val or">${fBubble(t.bonoFinal)}</div>
       <div style="font-size:10px;color:var(--text3);margin-top:4px">${t.bonoBase>0?'Base: '+f$(t.bonoBase):'No alcanzó 80% de meta'}</div></div>`;
 
   // Barra de progreso de estrellas
