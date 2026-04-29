@@ -1236,7 +1236,7 @@ async function deleteAllSupabase(){
 async function uploadToSupabase(techMap,filename){
   setSbStatus('Verificando duplicados…',null);
   try{
-    // ── 1. Construir todas las filas del Excel ────────────────────────────────
+    // ── 1. Construir todas las filas (ya deduplicadas por seenOTs_xl en processWorkbook) ──
     const allRows=[];
     Object.values(techMap).forEach(tech=>{
       tech.orders.forEach(o=>{
@@ -1245,69 +1245,44 @@ async function uploadToSupabase(techMap,filename){
       });
     });
 
-    // ── 2. Dedup intra-archivo (mismo OT dos veces en el Excel) ───────────────
+    // ── 2. Dedup intra-archivo: detectar OTs repetidas para mostrar en popup ──
+    // (el techMap ya viene limpio, esto es solo para reportar al usuario)
     const seenInFile=new Set();
     const intraDupes=[];
-    const dedupedRows=[];
+    const cleanRows=[];
     allRows.forEach(r=>{
       const key=r.ot_num||r.os_num;
       if(key&&seenInFile.has(key)){
-        // Solo es duplicado si tiene clave Y ya la vimos antes
         intraDupes.push({...r,_motivo:'Duplicado en el Excel'});
       } else {
         if(key)seenInFile.add(key);
-        dedupedRows.push(r);
+        cleanRows.push(r);
       }
     });
 
-    // ── 3. Consultar OTs que ya existen en Supabase (por semanas del Excel) ───
-    const weeksInFile=[...new Set(dedupedRows.map(r=>r.semana))];
-    let existingOTMap={};
-    if(weeksInFile.length&&dedupedRows.length){
-      setSbStatus('Consultando BD…',null);
-      // Paginar en caso de muchas semanas
-      const WBATCH=50;
-      for(let i=0;i<weeksInFile.length;i+=WBATCH){
-        const chunk=weeksInFile.slice(i,i+WBATCH);
-        const{data,error}=await _sb.from('orders')
-          .select('ot_num,os_num,dia,semana,nombre')
-          .in('semana',chunk);
-        if(error)throw error;
-        (data||[]).forEach(r=>{
-          const key=r.ot_num||r.os_num;
-          if(key)existingOTMap[key]={dia:r.dia,semana:r.semana,nombre:r.nombre};
-        });
-      }
+    // ── 3. Borrar las semanas del Excel en Supabase y re-insertar ─────────────
+    // Garantiza que Supabase = exactamente lo que está en el Excel (sin diferencias)
+    const weeksInFile=[...new Set(cleanRows.map(r=>r.semana))];
+    if(weeksInFile.length){
+      setSbStatus('Actualizando BD…',null);
+      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile).not('id','is',null);
+      if(delErr)throw delErr;
     }
 
-    // ── 4. Separar nuevas vs duplicadas en BD ─────────────────────────────────
-    const dbDupes=[];
-    const toInsert=dedupedRows.filter(r=>{
-      const key=r.ot_num||r.os_num;
-      if(key&&existingOTMap[key]){
-        dbDupes.push({...r,_motivo:'Ya existe en la BD',_fechaExistente:existingOTMap[key].dia,_semanaExistente:existingOTMap[key].semana});
-        return false;
-      }
-      return true;
-    });
-
-    const allDupes=[...intraDupes,...dbDupes];
-
-    // ── 5. Insertar solo las nuevas ───────────────────────────────────────────
-    if(toInsert.length){
-      setSbStatus('Subiendo datos…',null);
+    // ── 4. Insertar en batches ────────────────────────────────────────────────
+    if(cleanRows.length){
       const BATCH=500;
-      for(let i=0;i<toInsert.length;i+=BATCH){
-        const{error}=await _sb.from('orders').insert(toInsert.slice(i,i+BATCH));
+      for(let i=0;i<cleanRows.length;i+=BATCH){
+        const{error}=await _sb.from('orders').insert(cleanRows.slice(i,i+BATCH));
         if(error)throw error;
-        setSbStatus(`Subiendo… ${Math.min(i+BATCH,toInsert.length).toLocaleString()}/${toInsert.length.toLocaleString()}`,null);
+        setSbStatus(`Subiendo… ${Math.min(i+BATCH,cleanRows.length).toLocaleString()}/${cleanRows.length.toLocaleString()}`,null);
       }
     }
-    setSbStatus(`✓ ${toInsert.length.toLocaleString()} nuevas · ${allDupes.length} omitidas`,true);
+    setSbStatus(`✓ ${cleanRows.length.toLocaleString()} órdenes · ${intraDupes.length} duplicados omitidos`,true);
 
-    // ── 6. Mostrar popup si hay duplicados ────────────────────────────────────
-    if(allDupes.length){
-      showDupesModal(allDupes,toInsert.length,allRows.length);
+    // ── 5. Mostrar popup si había duplicados en el Excel ─────────────────────
+    if(intraDupes.length){
+      showDupesModal(intraDupes,cleanRows.length,allRows.length);
     }
 
   }catch(err){
