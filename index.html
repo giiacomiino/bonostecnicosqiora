@@ -1484,9 +1484,15 @@ function generateData(wk){
 // ═══════════════════════════════════════════
 // FORMATTERS
 // ═══════════════════════════════════════════
-const f$=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
-const fM=n=>'$'+(n/1000000).toFixed(1)+'M';
-const fk=n=>{if(n>=1000000)return '$'+(n/1000).toFixed(0)+'k';if(n>=1000)return '$'+(n/1000).toFixed(1)+'k';return '$'+Math.round(n);};
+const f$=n=>{
+  if(n===null||n===undefined||isNaN(n))return '$0';
+  const abs=Math.abs(n),sign=n<0?'−':'';
+  if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(1).replace(/\.0$/,'')+'M';
+  if(abs>=1e3)return sign+'$'+(abs/1e3).toFixed(1).replace(/\.0$/,'')+'k';
+  return sign+'$'+Math.round(abs);
+};
+const fM=n=>f$(n);
+const fk=n=>f$(n);
 const fp=n=>n.toFixed(1)+'%';
 const distShort=d=>d.replace('CTA-TPI-INT-','');
 function initials(n){const p=n.split(' ');return((p[0]||'')[0]+(p[1]||'')[0]).toUpperCase();}
