@@ -499,11 +499,13 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
             <div class="kpi-row kpi-5" id="kpi-dist"></div>
 
             <div class="g2 mb">
-              <!-- Comparativa por tipo de cuadrilla -->
+              <!-- Cascada penalizaciones -->
               <div class="cc">
                 <div class="cc-head">
-                  <div><div class="cc-title">Rendimiento por Tipo de Cuadrilla</div><div class="cc-sub" id="cascade-sub">% alcance promedio · estrellas vs meta · bono neto</div></div>
-                  <span class="chip chip-or">CUADRILLAS</span>
+                  <div><div class="cc-title">Cascada de Penalizaciones</div><div class="cc-sub">Inasistencias: Conteo y Monto Acumulado</div></div>
+                  <span class="icon-btn" style="background:var(--or-light);border-color:var(--or-border)">
+                    <svg width="15" height="15" fill="none" stroke="var(--or)" stroke-width="2" viewBox="0 0 24 24"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg>
+                  </span>
                 </div>
                 <div style="height:200px"><canvas id="chart-cascade"></canvas></div>
               </div>
@@ -1230,9 +1232,16 @@ async function deleteAllSupabase(){
 }
 
 async function uploadToSupabase(techMap,filename){
-  setSbStatus('Subiendo a Supabase…',null);
+  setSbStatus('Subiendo datos…',null);
   try{
-    // Construir todas las filas desde el techMap
+    // Borrar solo las semanas del nuevo Excel (conserva semanas anteriores)
+    const weeksInFile=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))];
+    if(weeksInFile.length){
+      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile).not('id','is',null);
+      if(delErr)throw delErr;
+    }
+
+    // Construir filas
     const rows=[];
     Object.values(techMap).forEach(tech=>{
       tech.orders.forEach(o=>{
@@ -1241,14 +1250,6 @@ async function uploadToSupabase(techMap,filename){
       });
     });
 
-    // Borrar las semanas del archivo en Supabase y re-insertar
-    const weeks=[...new Set(rows.map(r=>r.semana))];
-    if(weeks.length){
-      setSbStatus('Actualizando BD…',null);
-      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeks).not('id','is',null);
-      if(delErr)throw delErr;
-    }
-
     // Insertar en batches de 500
     const BATCH=500;
     for(let i=0;i<rows.length;i+=BATCH){
@@ -1256,76 +1257,11 @@ async function uploadToSupabase(techMap,filename){
       if(error)throw error;
       setSbStatus(`Subiendo… ${Math.min(i+BATCH,rows.length).toLocaleString()}/${rows.length.toLocaleString()}`,null);
     }
-
-    // Verificar conteo real en BD
-    const{count:sbCount,error:cntErr}=await _sb.from('orders').select('*',{count:'exact',head:true}).in('semana',weeks);
-    if(!cntErr&&sbCount!==rows.length){
-      setSbStatus(`⚠️ Enviadas: ${rows.length.toLocaleString()} · En BD: ${sbCount.toLocaleString()} — hay diferencia`,false);
-      console.warn('Upload mismatch: sent',rows.length,'but DB has',sbCount,'for weeks',weeks);
-    } else {
-      setSbStatus(`✓ ${rows.length.toLocaleString()} órdenes guardadas`,true);
-    }
-
+    setSbStatus(`✓ ${rows.length.toLocaleString()} órdenes guardadas en Supabase`,true);
   }catch(err){
     setSbStatus('Error al subir: '+err.message,false);
     console.error('Supabase upload error:',err);
   }
-}
-
-function showDupesModal(dupes,inserted,total){
-  const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const fmtWk=wk=>{if(!wk)return '—';try{const m=getMondayOfWeek(new Date(wk+'T12:00:00'));return `${m.getDate()} ${MNS[m.getMonth()]} ${m.getFullYear()}`;}catch{return wk;}};
-  const fmtDia=d=>{if(!d)return '—';try{const p=d.split('-');return `${p[2]}/${p[1]}/${p[0]}`;}catch{return d;}};
-
-  const intraDupes=dupes.filter(d=>d._motivo==='Duplicado en el Excel');
-  const dbDupes=dupes.filter(d=>d._motivo==='Ya existe en la BD');
-
-  // Agrupar por semana para el resumen
-  const bySem={};
-  dupes.forEach(d=>{
-    const sem=d._semanaExistente||d.semana||'—';
-    if(!bySem[sem])bySem[sem]={count:0,label:fmtWk(sem)};
-    bySem[sem].count++;
-  });
-  const semRows=Object.values(bySem).sort((a,b)=>a.label.localeCompare(b.label))
-    .map(s=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F3F4F6;font-size:12px"><span>Semana ${s.label}</span><span style="font-weight:700">${s.count} OTs</span></div>`).join('');
-
-  // Tabla detalle (máx 200 filas para no colapsar el navegador)
-  const show=dupes.slice(0,200);
-  const detailRows=show.map(d=>`
-    <tr>
-      <td style="padding:6px 8px;font-size:11px;color:var(--text2)">${d.ot_num||d.os_num||'—'}</td>
-      <td style="padding:6px 8px;font-size:11px">${d.nombre||'—'}</td>
-      <td style="padding:6px 8px;font-size:11px;color:var(--text3)">${fmtDia(d.dia)}</td>
-      <td style="padding:6px 8px;font-size:11px;color:var(--text3)">${fmtWk(d.semana)}</td>
-      <td style="padding:6px 8px">
-        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${d._motivo==='Duplicado en el Excel'?'#FEF3C7':'#FEE2E2'};color:${d._motivo==='Duplicado en el Excel'?'#92400E':'#991B1B'}">
-          ${d._motivo==='Duplicado en el Excel'?'Excel':'Ya en BD'}
-        </span>
-      </td>
-    </tr>`).join('');
-
-  const m=document.getElementById('dupes-modal');
-  m.querySelector('#dupes-summary').innerHTML=`
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-      <div style="background:#F0FDF4;border-radius:8px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:#16A34A">${inserted.toLocaleString()}</div>
-        <div style="font-size:11px;color:#166534;margin-top:2px">Órdenes subidas</div>
-      </div>
-      <div style="background:#FEF3C7;border-radius:8px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:#92400E">${intraDupes.length.toLocaleString()}</div>
-        <div style="font-size:11px;color:#78350F;margin-top:2px">Duplicadas en Excel</div>
-      </div>
-      <div style="background:#FEE2E2;border-radius:8px;padding:12px;text-align:center">
-        <div style="font-size:22px;font-weight:800;color:#991B1B">${dbDupes.length.toLocaleString()}</div>
-        <div style="font-size:11px;color:#7F1D1D;margin-top:2px">Ya existían en BD</div>
-      </div>
-    </div>
-    <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">OMITIDAS POR SEMANA</div>
-    ${semRows}
-    ${dupes.length>200?`<div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center">Mostrando primeras 200 de ${dupes.length.toLocaleString()} omitidas</div>`:''}`;
-  m.querySelector('#dupes-detail-body').innerHTML=detailRows;
-  m.style.display='flex';
 }
 
 // ═══════════════════════════════════════════
@@ -1548,22 +1484,9 @@ function generateData(wk){
 // ═══════════════════════════════════════════
 // FORMATTERS
 // ═══════════════════════════════════════════
-// Número completo con separador de miles — para tablas, tooltips y ejes de gráficas
-const f$=n=>{
-  if(n===null||n===undefined||isNaN(n))return '$0';
-  const abs=Math.abs(n),sign=n<0?'−':'';
-  return sign+'$'+Math.round(abs).toLocaleString('es-MX');
-};
-const fM=n=>f$(n);
-const fk=n=>f$(n);
-// Formato compacto con 2 decimales — solo para KPI bubbles grandes
-const fBubble=n=>{
-  if(!n&&n!==0)return '$0';
-  const abs=Math.abs(n),sign=n<0?'−':'';
-  if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(2)+'M';
-  if(abs>=1e3)return sign+'$'+(abs/1e3).toFixed(2)+'k';
-  return sign+'$'+Math.round(abs);
-};
+const f$=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
+const fM=n=>'$'+(n/1000000).toFixed(1)+'M';
+const fk=n=>{if(n>=1000000)return '$'+(n/1000).toFixed(0)+'k';if(n>=1000)return '$'+(n/1000).toFixed(1)+'k';return '$'+Math.round(n);};
 const fp=n=>n.toFixed(1)+'%';
 const distShort=d=>d.replace('CTA-TPI-INT-','');
 function initials(n){const p=n.split(' ');return((p[0]||'')[0]+(p[1]||'')[0]).toUpperCase();}
@@ -1635,7 +1558,7 @@ function renderNacional(){
 
   document.getElementById('kpi-nacional').innerHTML=`
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)"><svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>MONTO TOTAL BONOS</div>
-      <div class="kpi-val or">${fBubble(totalBonos)}</div>
+      <div class="kpi-val or">${fk(totalBonos)}</div>
       <div class="kpi-sub" style="color:var(--text3)">${total} técnicos en período</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>CUADRILLAS ACTIVAS</div>
@@ -2044,7 +1967,7 @@ function renderDistDetail(d){
       <div class="kpi-val ${lmColor}">${avgPct}%</div>
       <span class="status-tag ${lmStatus}">${lmMsg}</span></div>
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">MONTO BONOS DISTRITO</div>
-      <div class="kpi-val or">${fBubble(totalB)}</div>
+      <div class="kpi-val or">${fk(totalB)}</div>
       <div class="kpi-sub">${total} técnicos</div></div>
     <div class="kpi-c green-top"><div class="kpi-label">CUADRILLAS ACTIVAS</div>
       <div class="kpi-val gr">${activas}</div>
@@ -2058,103 +1981,23 @@ function renderDistDetail(d){
 
   // Cascade real: Bono Base → +110% → −Descuento → Neto
   const baseB=tecs.reduce((s,t)=>s+t.bonoBase,0);
-  // ── Rendimiento por tipo de cuadrilla ─────────────────────────────────────
-  // Agrupa los técnicos del distrito por su skill y calcula métricas por grupo
-  const SK_LABELS={Normal:'Normal',Moto:'Moto',Hibrida:'Híbrida',Elite:'Elite',Multidistrito:'Multidist.'};
-  const skGroups={};
-  tecs.forEach(t=>{
-    const sk=t.skill||'Normal';
-    if(!skGroups[sk])skGroups[sk]={label:SK_LABELS[sk]||sk,tecs:[],meta:METAS[d]?.[{Normal:'N',Moto:'Mo',Hibrida:'H',Elite:'E',Multidistrito:'Mu'}[sk]]||84};
-    skGroups[sk].tecs.push(t);
-  });
-  const skEntries=Object.entries(skGroups).filter(([,g])=>g.tecs.length>0)
-    .sort((a,b)=>b[1].tecs.length-a[1].tecs.length);
-
-  const skLabels=skEntries.map(([,g])=>`${g.label} (${g.tecs.length})`);
-  const skPct   =skEntries.map(([,g])=>+(g.tecs.reduce((s,t)=>s+t.pct,0)/g.tecs.length).toFixed(1));
-  const skBono  =skEntries.map(([,g])=>Math.round(g.tecs.reduce((s,t)=>s+t.bonoFinal,0)/g.tecs.length));
-  const skMeta  =skEntries.map(([,g])=>g.meta);
-  const skAvgEst=skEntries.map(([,g])=>+(g.tecs.reduce((s,t)=>s+t.estrellas,0)/g.tecs.length).toFixed(1));
-
-  const barColors=skPct.map(p=>p>=100?'#16A34A':p>=90?'#E85420':p>=80?'#F59E0B':'#EF4444');
-  const barAlpha =skPct.map(p=>p>=100?'rgba(22,163,74,.12)':p>=90?'rgba(232,84,32,.10)':p>=80?'rgba(245,158,11,.12)':'rgba(239,68,68,.12)');
-
+  const extra110=tecs.reduce((s,t)=>s+t.bono110,0);
+  const descTotal=tecs.reduce((s,t)=>s+t.descuento,0);
+  const netoFinal=tecs.reduce((s,t)=>s+t.bonoFinal,0);
   if(chartCascade)chartCascade.destroy();
   chartCascade=new Chart(document.getElementById('chart-cascade'),{
     type:'bar',
     data:{
-      labels:skLabels,
-      datasets:[
-        {
-          label:'% Alcance promedio',
-          data:skPct,
-          backgroundColor:barColors,
-          borderColor:barColors,
-          borderWidth:0,
-          borderRadius:5,
-          borderSkipped:false,
-          yAxisID:'y',
-        },
-        {
-          label:'Meta (⭐)',
-          data:skMeta,
-          type:'line',
-          borderColor:'rgba(0,0,0,.18)',
-          borderWidth:1.5,
-          borderDash:[4,3],
-          pointRadius:0,
-          fill:false,
-          yAxisID:'y2',
-          tension:0,
-        },
-        {
-          label:'⭐ Prom.',
-          data:skAvgEst,
-          type:'line',
-          borderColor:'#2563EB',
-          backgroundColor:'rgba(37,99,235,.08)',
-          borderWidth:2,
-          pointRadius:3,
-          pointBackgroundColor:'#2563EB',
-          fill:false,
-          yAxisID:'y2',
-          tension:.3,
-        },
-      ]
+      labels:['Bono Base',extra110>0?'+ Extra 110%':null,'− Descuentos','Neto Final'].filter(Boolean),
+      datasets:[{
+        data:[baseB,extra110>0?extra110:null,descTotal>0?-descTotal:null,netoFinal].filter(v=>v!==null),
+        backgroundColor:[baseB>0?'#C8D0E0':'#eee',extra110>0?'#16A34A':null,descTotal>0?'#FCA5A5':null,'#E85420'].filter(v=>v!==null),
+        borderRadius:4,borderSkipped:false
+      }]
     },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          mode:'index',intersect:false,
-          callbacks:{
-            title:ctx=>skEntries[ctx[0].dataIndex][1].label+' — '+skEntries[ctx[0].dataIndex][1].tecs.length+' técnicos',
-            label:ctx=>{
-              const i=ctx.dataIndex;
-              if(ctx.datasetIndex===0)return `% Alcance prom: ${skPct[i]}%`;
-              if(ctx.datasetIndex===1)return `Meta: ⭐ ${skMeta[i]}`;
-              if(ctx.datasetIndex===2)return `⭐ Prom: ${skAvgEst[i]}  ·  Bono neto prom: ${f$(skBono[i])}`;
-            }
-          }
-        }
-      },
-      scales:{
-        x:{grid:{display:false},ticks:{font:{size:10}}},
-        y:{
-          position:'left',min:0,max:Math.max(140,Math.ceil(Math.max(...skPct)/10)*10+10),
-          ticks:{callback:v=>v+'%',font:{size:10}},
-          grid:{color:'#F3F4F6'},
-          title:{display:true,text:'% Alcance',font:{size:9},color:'var(--text3)'}
-        },
-        y2:{
-          position:'right',min:0,
-          grid:{drawOnChartArea:false},
-          ticks:{callback:v=>'⭐'+v,font:{size:10}},
-          title:{display:true,text:'Estrellas',font:{size:9},color:'var(--text3)'}
-        }
-      }
-    }
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(Math.abs(c.parsed.y))}}},
+      scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>fk(Math.abs(v)),font:{size:10}},grid:{color:'#F3F4F6'}}}}
   });
 
   // Top coordinadores del distrito — ordenados por bono total del equipo, descendente
@@ -2474,7 +2317,7 @@ function renderCoordDetail(coord){
       <div class="kpi-val or">${prodProm}</div>
       <div class="kpi-sub">OS / cuadrilla / día</div></div>
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">TOTAL BONOS EQUIPO</div>
-      <div class="kpi-val or">${fBubble(tendBono)}</div>
+      <div class="kpi-val or">${fk(tendBono)}</div>
       <div class="kpi-sub">${total} técnicos en equipo</div></div>`;
 
   // Pirámide — OS reales por tipo de servicio del coordinador
@@ -2752,7 +2595,7 @@ function renderFicha(t){
       <div class="kpi-sub">${t.inas>0?`<span style="color:var(--red)">${t.inas} inasistencia(s)</span>`:'Sin inasistencias'}</div></div>
 
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)">BONO NETO FINAL</div>
-      <div class="kpi-val or">${fBubble(t.bonoFinal)}</div>
+      <div class="kpi-val or">${f$(t.bonoFinal)}</div>
       <div style="font-size:10px;color:var(--text3);margin-top:4px">${t.bonoBase>0?'Base: '+f$(t.bonoBase):'No alcanzó 80% de meta'}</div></div>`;
 
   // Barra de progreso de estrellas
@@ -3363,11 +3206,13 @@ function processWorkbook(wb,filename){
     const skill=normSkill(clean(row[C.skill]||''));
     const osNum =clean(row[C.os]||'');
     const otNum =clean(row[C.ot]||'');
+    // 'Tipo' es el tipo de servicio que se usa para calcular puntos con svcPoints
     const tipo  =clean(row[C.tipo]||row[C.servicio]||'Soporte');
     const wk    =weekKey(fecha);
     const dia   =fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0')+'-'+String(fecha.getDate()).padStart(2,'0');
 
     const coordRaw=clean(C.coord>=0?row[C.coord]||'':'');
+    // Mostrar coordinador: si viene en formato CTA-TPI-INT-*, quitar prefijo
     const coordNom=coordRaw.startsWith('CTA-TPI-INT-')?coordRaw.replace('CTA-TPI-INT-',''):coordRaw;
 
     if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[]};
@@ -4075,45 +3920,6 @@ renderNacional();
 renderConfig();
 loadFromSupabase();
 </script>
-
-<!-- MODAL: OTs duplicadas al subir Excel -->
-<div id="dupes-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:24px">
-  <div style="background:white;border-radius:14px;width:min(760px,95vw);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">
-    <!-- Header -->
-    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-      <div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <svg width="18" height="18" fill="none" stroke="#DC2626" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <div style="font-size:15px;font-weight:800">Órdenes omitidas por duplicado</div>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:3px;padding-left:26px">Las siguientes OTs no se subieron porque ya existen en la base de datos o estaban repetidas en el Excel</div>
-      </div>
-      <button onclick="document.getElementById('dupes-modal').style.display='none'" style="width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:white;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
-    </div>
-    <!-- Summary + by-week -->
-    <div style="padding:16px 22px;border-bottom:1px solid var(--border);flex-shrink:0" id="dupes-summary"></div>
-    <!-- Detail table -->
-    <div style="overflow-y:auto;flex:1;padding:0 22px 16px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.04em;margin:14px 0 8px">DETALLE DE ÓRDENES OMITIDAS</div>
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="background:#F8F9FA;position:sticky;top:0">
-            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">OT / OS</th>
-            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Técnico</th>
-            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Fecha término</th>
-            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Semana</th>
-            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Motivo</th>
-          </tr>
-        </thead>
-        <tbody id="dupes-detail-body"></tbody>
-      </table>
-    </div>
-    <!-- Footer -->
-    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;background:#FAFAFA;flex-shrink:0">
-      <button onclick="document.getElementById('dupes-modal').style.display='none'" style="padding:8px 20px;border-radius:8px;border:none;background:var(--or);color:white;font-size:13px;font-weight:700;cursor:pointer">Entendido</button>
-    </div>
-  </div>
-</div>
 
 <!-- MODAL: Exportar datos -->
 <div id="export-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:24px">
