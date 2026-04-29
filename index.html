@@ -1232,36 +1232,141 @@ async function deleteAllSupabase(){
 }
 
 async function uploadToSupabase(techMap,filename){
-  setSbStatus('Subiendo datos…',null);
+  setSbStatus('Verificando duplicados…',null);
   try{
-    // Borrar solo las semanas del nuevo Excel (conserva semanas anteriores)
-    const weeksInFile=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))];
-    if(weeksInFile.length){
-      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile).not('id','is',null);
-      if(delErr)throw delErr;
-    }
-
-    // Construir filas
-    const rows=[];
+    // ── 1. Construir todas las filas del Excel ────────────────────────────────
+    const allRows=[];
     Object.values(techMap).forEach(tech=>{
       tech.orders.forEach(o=>{
-        rows.push({ffm:tech.ffm,nombre:tech.nombre,distrito:tech.dist,skill:tech.skill,
+        allRows.push({ffm:tech.ffm,nombre:tech.nombre,distrito:tech.dist,skill:tech.skill,
           coord:tech.coord,fecha:o.dia,tipo:o.tipo,os_num:o.os,ot_num:o.ot,semana:o.wk,dia:o.dia});
       });
     });
 
-    // Insertar en batches de 500
-    const BATCH=500;
-    for(let i=0;i<rows.length;i+=BATCH){
-      const{error}=await _sb.from('orders').insert(rows.slice(i,i+BATCH));
-      if(error)throw error;
-      setSbStatus(`Subiendo… ${Math.min(i+BATCH,rows.length).toLocaleString()}/${rows.length.toLocaleString()}`,null);
+    // ── 2. Dedup intra-archivo (mismo OT dos veces en el Excel) ───────────────
+    const seenInFile=new Set();
+    const intraDupes=[];
+    const dedupedRows=[];
+    allRows.forEach(r=>{
+      const key=r.ot_num||r.os_num; // usar OT como clave; si no hay OT, usar OS
+      if(!key||seenInFile.has(key)){
+        intraDupes.push({...r,_motivo:'Duplicado en el Excel'});
+      } else {
+        seenInFile.add(key);
+        dedupedRows.push(r);
+      }
+    });
+
+    // ── 3. Consultar OTs que ya existen en Supabase (por semanas del Excel) ───
+    const weeksInFile=[...new Set(dedupedRows.map(r=>r.semana))];
+    let existingOTMap={};
+    if(weeksInFile.length&&dedupedRows.length){
+      setSbStatus('Consultando BD…',null);
+      // Paginar en caso de muchas semanas
+      const WBATCH=50;
+      for(let i=0;i<weeksInFile.length;i+=WBATCH){
+        const chunk=weeksInFile.slice(i,i+WBATCH);
+        const{data,error}=await _sb.from('orders')
+          .select('ot_num,os_num,dia,semana,nombre')
+          .in('semana',chunk);
+        if(error)throw error;
+        (data||[]).forEach(r=>{
+          const key=r.ot_num||r.os_num;
+          if(key)existingOTMap[key]={dia:r.dia,semana:r.semana,nombre:r.nombre};
+        });
+      }
     }
-    setSbStatus(`✓ ${rows.length.toLocaleString()} órdenes guardadas en Supabase`,true);
+
+    // ── 4. Separar nuevas vs duplicadas en BD ─────────────────────────────────
+    const dbDupes=[];
+    const toInsert=dedupedRows.filter(r=>{
+      const key=r.ot_num||r.os_num;
+      if(key&&existingOTMap[key]){
+        dbDupes.push({...r,_motivo:'Ya existe en la BD',_fechaExistente:existingOTMap[key].dia,_semanaExistente:existingOTMap[key].semana});
+        return false;
+      }
+      return true;
+    });
+
+    const allDupes=[...intraDupes,...dbDupes];
+
+    // ── 5. Insertar solo las nuevas ───────────────────────────────────────────
+    if(toInsert.length){
+      setSbStatus('Subiendo datos…',null);
+      const BATCH=500;
+      for(let i=0;i<toInsert.length;i+=BATCH){
+        const{error}=await _sb.from('orders').insert(toInsert.slice(i,i+BATCH));
+        if(error)throw error;
+        setSbStatus(`Subiendo… ${Math.min(i+BATCH,toInsert.length).toLocaleString()}/${toInsert.length.toLocaleString()}`,null);
+      }
+    }
+    setSbStatus(`✓ ${toInsert.length.toLocaleString()} nuevas · ${allDupes.length} omitidas`,true);
+
+    // ── 6. Mostrar popup si hay duplicados ────────────────────────────────────
+    if(allDupes.length){
+      showDupesModal(allDupes,toInsert.length,allRows.length);
+    }
+
   }catch(err){
     setSbStatus('Error al subir: '+err.message,false);
     console.error('Supabase upload error:',err);
   }
+}
+
+function showDupesModal(dupes,inserted,total){
+  const MNS=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const fmtWk=wk=>{if(!wk)return '—';try{const m=getMondayOfWeek(new Date(wk+'T12:00:00'));return `${m.getDate()} ${MNS[m.getMonth()]} ${m.getFullYear()}`;}catch{return wk;}};
+  const fmtDia=d=>{if(!d)return '—';try{const p=d.split('-');return `${p[2]}/${p[1]}/${p[0]}`;}catch{return d;}};
+
+  const intraDupes=dupes.filter(d=>d._motivo==='Duplicado en el Excel');
+  const dbDupes=dupes.filter(d=>d._motivo==='Ya existe en la BD');
+
+  // Agrupar por semana para el resumen
+  const bySem={};
+  dupes.forEach(d=>{
+    const sem=d._semanaExistente||d.semana||'—';
+    if(!bySem[sem])bySem[sem]={count:0,label:fmtWk(sem)};
+    bySem[sem].count++;
+  });
+  const semRows=Object.values(bySem).sort((a,b)=>a.label.localeCompare(b.label))
+    .map(s=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #F3F4F6;font-size:12px"><span>Semana ${s.label}</span><span style="font-weight:700">${s.count} OTs</span></div>`).join('');
+
+  // Tabla detalle (máx 200 filas para no colapsar el navegador)
+  const show=dupes.slice(0,200);
+  const detailRows=show.map(d=>`
+    <tr>
+      <td style="padding:6px 8px;font-size:11px;color:var(--text2)">${d.ot_num||d.os_num||'—'}</td>
+      <td style="padding:6px 8px;font-size:11px">${d.nombre||'—'}</td>
+      <td style="padding:6px 8px;font-size:11px;color:var(--text3)">${fmtDia(d.dia)}</td>
+      <td style="padding:6px 8px;font-size:11px;color:var(--text3)">${fmtWk(d.semana)}</td>
+      <td style="padding:6px 8px">
+        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${d._motivo==='Duplicado en el Excel'?'#FEF3C7':'#FEE2E2'};color:${d._motivo==='Duplicado en el Excel'?'#92400E':'#991B1B'}">
+          ${d._motivo==='Duplicado en el Excel'?'Excel':'Ya en BD'}
+        </span>
+      </td>
+    </tr>`).join('');
+
+  const m=document.getElementById('dupes-modal');
+  m.querySelector('#dupes-summary').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+      <div style="background:#F0FDF4;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#16A34A">${inserted.toLocaleString()}</div>
+        <div style="font-size:11px;color:#166534;margin-top:2px">Órdenes subidas</div>
+      </div>
+      <div style="background:#FEF3C7;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#92400E">${intraDupes.length.toLocaleString()}</div>
+        <div style="font-size:11px;color:#78350F;margin-top:2px">Duplicadas en Excel</div>
+      </div>
+      <div style="background:#FEE2E2;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:22px;font-weight:800;color:#991B1B">${dbDupes.length.toLocaleString()}</div>
+        <div style="font-size:11px;color:#7F1D1D;margin-top:2px">Ya existían en BD</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px">OMITIDAS POR SEMANA</div>
+    ${semRows}
+    ${dupes.length>200?`<div style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center">Mostrando primeras 200 de ${dupes.length.toLocaleString()} omitidas</div>`:''}`;
+  m.querySelector('#dupes-detail-body').innerHTML=detailRows;
+  m.style.display='flex';
 }
 
 // ═══════════════════════════════════════════
@@ -3926,6 +4031,45 @@ renderNacional();
 renderConfig();
 loadFromSupabase();
 </script>
+
+<!-- MODAL: OTs duplicadas al subir Excel -->
+<div id="dupes-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:24px">
+  <div style="background:white;border-radius:14px;width:min(760px,95vw);max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden">
+    <!-- Header -->
+    <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="18" height="18" fill="none" stroke="#DC2626" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div style="font-size:15px;font-weight:800">Órdenes omitidas por duplicado</div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;padding-left:26px">Las siguientes OTs no se subieron porque ya existen en la base de datos o estaban repetidas en el Excel</div>
+      </div>
+      <button onclick="document.getElementById('dupes-modal').style.display='none'" style="width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:white;cursor:pointer;font-size:16px;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <!-- Summary + by-week -->
+    <div style="padding:16px 22px;border-bottom:1px solid var(--border);flex-shrink:0" id="dupes-summary"></div>
+    <!-- Detail table -->
+    <div style="overflow-y:auto;flex:1;padding:0 22px 16px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.04em;margin:14px 0 8px">DETALLE DE ÓRDENES OMITIDAS</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#F8F9FA;position:sticky;top:0">
+            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">OT / OS</th>
+            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Técnico</th>
+            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Fecha término</th>
+            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Semana</th>
+            <th style="padding:7px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border)">Motivo</th>
+          </tr>
+        </thead>
+        <tbody id="dupes-detail-body"></tbody>
+      </table>
+    </div>
+    <!-- Footer -->
+    <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;background:#FAFAFA;flex-shrink:0">
+      <button onclick="document.getElementById('dupes-modal').style.display='none'" style="padding:8px 20px;border-radius:8px;border:none;background:var(--or);color:white;font-size:13px;font-weight:700;cursor:pointer">Entendido</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: Exportar datos -->
 <div id="export-modal" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;padding:24px">
