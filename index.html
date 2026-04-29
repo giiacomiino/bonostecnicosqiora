@@ -1016,7 +1016,6 @@ async function loadFromSupabase(){
     }
 
     const techMap={};
-    const seenOTs_sb=new Set(); // dedup global por OT/OS — evita duplicados de Supabase
     let minDate=null,maxDate=null;
     all.forEach(row=>{
       const techKey=row.ffm||row.nombre;
@@ -1030,9 +1029,6 @@ async function loadFromSupabase(){
       if(row.coord&&!techMap[techKey].coord)techMap[techKey].coord=row.coord;
       const wk=row.semana||weekKey(fecha);
       const dia=row.dia||fecha.toISOString().slice(0,10);
-      // Dedup: saltar si ya procesamos este OT/OS
-      const otKey=row.ot_num||row.os_num;
-      if(otKey){if(seenOTs_sb.has(otKey))return;seenOTs_sb.add(otKey);}
       techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:row.os_num||'',ot:row.ot_num||'',wk,dia});
       if(!minDate||fecha<minDate)minDate=fecha;
       if(!maxDate||fecha>maxDate)maxDate=fecha;
@@ -1234,56 +1230,33 @@ async function deleteAllSupabase(){
 }
 
 async function uploadToSupabase(techMap,filename){
-  setSbStatus('Verificando duplicados…',null);
+  setSbStatus('Subiendo a Supabase…',null);
   try{
-    // ── 1. Construir todas las filas (ya deduplicadas por seenOTs_xl en processWorkbook) ──
-    const allRows=[];
+    // Construir todas las filas desde el techMap
+    const rows=[];
     Object.values(techMap).forEach(tech=>{
       tech.orders.forEach(o=>{
-        allRows.push({ffm:tech.ffm,nombre:tech.nombre,distrito:tech.dist,skill:tech.skill,
+        rows.push({ffm:tech.ffm,nombre:tech.nombre,distrito:tech.dist,skill:tech.skill,
           coord:tech.coord,fecha:o.dia,tipo:o.tipo,os_num:o.os,ot_num:o.ot,semana:o.wk,dia:o.dia});
       });
     });
 
-    // ── 2. Dedup intra-archivo: detectar OTs repetidas para mostrar en popup ──
-    // (el techMap ya viene limpio, esto es solo para reportar al usuario)
-    const seenInFile=new Set();
-    const intraDupes=[];
-    const cleanRows=[];
-    allRows.forEach(r=>{
-      const key=r.ot_num||r.os_num;
-      if(key&&seenInFile.has(key)){
-        intraDupes.push({...r,_motivo:'Duplicado en el Excel'});
-      } else {
-        if(key)seenInFile.add(key);
-        cleanRows.push(r);
-      }
-    });
-
-    // ── 3. Borrar las semanas del Excel en Supabase y re-insertar ─────────────
-    // Garantiza que Supabase = exactamente lo que está en el Excel (sin diferencias)
-    const weeksInFile=[...new Set(cleanRows.map(r=>r.semana))];
-    if(weeksInFile.length){
+    // Borrar las semanas del archivo en Supabase y re-insertar
+    const weeks=[...new Set(rows.map(r=>r.semana))];
+    if(weeks.length){
       setSbStatus('Actualizando BD…',null);
-      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile).not('id','is',null);
+      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeks).not('id','is',null);
       if(delErr)throw delErr;
     }
 
-    // ── 4. Insertar en batches ────────────────────────────────────────────────
-    if(cleanRows.length){
-      const BATCH=500;
-      for(let i=0;i<cleanRows.length;i+=BATCH){
-        const{error}=await _sb.from('orders').insert(cleanRows.slice(i,i+BATCH));
-        if(error)throw error;
-        setSbStatus(`Subiendo… ${Math.min(i+BATCH,cleanRows.length).toLocaleString()}/${cleanRows.length.toLocaleString()}`,null);
-      }
+    // Insertar en batches de 500
+    const BATCH=500;
+    for(let i=0;i<rows.length;i+=BATCH){
+      const{error}=await _sb.from('orders').insert(rows.slice(i,i+BATCH));
+      if(error)throw error;
+      setSbStatus(`Subiendo… ${Math.min(i+BATCH,rows.length).toLocaleString()}/${rows.length.toLocaleString()}`,null);
     }
-    setSbStatus(`✓ ${cleanRows.length.toLocaleString()} órdenes · ${intraDupes.length} duplicados omitidos`,true);
-
-    // ── 5. Mostrar popup si había duplicados en el Excel ─────────────────────
-    if(intraDupes.length){
-      showDupesModal(intraDupes,cleanRows.length,allRows.length);
-    }
+    setSbStatus(`✓ ${rows.length.toLocaleString()} órdenes guardadas`,true);
 
   }catch(err){
     setSbStatus('Error al subir: '+err.message,false);
@@ -3365,7 +3338,6 @@ function processWorkbook(wb,filename){
 
   // ── PASO 1: leer todas las órdenes → techMap ─────────────────────────────
   const techMap={};
-  const seenOTs_xl=new Set(); // dedup global por OT/OS — evita duplicados del Excel
   let minDate=null, maxDate=null;
 
   dataRows.forEach(row=>{
@@ -3393,10 +3365,6 @@ function processWorkbook(wb,filename){
     if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[]};
     if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
     if(coordNom&&!techMap[techKey].coord)techMap[techKey].coord=coordNom;
-
-    // Dedup: saltar si ya procesamos este OT/OS (duplicados de Field Cloud)
-    const otKey=otNum||osNum;
-    if(otKey){if(seenOTs_xl.has(otKey))return;seenOTs_xl.add(otKey);}
 
     // Guardamos tipo (no puntos) → los puntos se calculan en rebuildFromRawOrders con SERVICIOS actuales
     techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
