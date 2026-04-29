@@ -1256,7 +1256,15 @@ async function uploadToSupabase(techMap,filename){
       if(error)throw error;
       setSbStatus(`Subiendo… ${Math.min(i+BATCH,rows.length).toLocaleString()}/${rows.length.toLocaleString()}`,null);
     }
-    setSbStatus(`✓ ${rows.length.toLocaleString()} órdenes guardadas`,true);
+
+    // Verificar conteo real en BD
+    const{count:sbCount,error:cntErr}=await _sb.from('orders').select('*',{count:'exact',head:true}).in('semana',weeks);
+    if(!cntErr&&sbCount!==rows.length){
+      setSbStatus(`⚠️ Enviadas: ${rows.length.toLocaleString()} · En BD: ${sbCount.toLocaleString()} — hay diferencia`,false);
+      console.warn('Upload mismatch: sent',rows.length,'but DB has',sbCount,'for weeks',weeks);
+    } else {
+      setSbStatus(`✓ ${rows.length.toLocaleString()} órdenes guardadas`,true);
+    }
 
   }catch(err){
     setSbStatus('Error al subir: '+err.message,false);
