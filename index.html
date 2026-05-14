@@ -1236,16 +1236,24 @@ async function deleteAllSupabase(){
 }
 
 async function uploadToSupabase(techMap,filename){
+  // Bloquear botones de Supabase mientras dura el upload
+  const sbBtn=document.querySelector('button[onclick="loadFromSupabase()"]');
+  const delBtn=document.querySelector('button[onclick="deleteAllSupabase()"]');
+  const loadBtn=document.getElementById('load-btn-label');
+  if(sbBtn){sbBtn.disabled=true;sbBtn.style.opacity='0.5';}
+  if(delBtn){delBtn.disabled=true;delBtn.style.opacity='0.5';}
+
   setSbStatus('Subiendo datos…',null);
   try{
     // Borrar solo las semanas del nuevo Excel (conserva semanas anteriores)
     const weeksInFile=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))];
     if(weeksInFile.length){
+      setSbStatus('Borrando semanas anteriores…',null);
       const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile).not('id','is',null);
       if(delErr)throw delErr;
     }
 
-    // Construir filas (dedup por OT para garantizar que la BD queda limpia)
+    // Construir filas (dedup por OT — protección extra)
     const rows=[];
     const seenUpload=new Set();
     Object.values(techMap).forEach(tech=>{
@@ -1259,15 +1267,27 @@ async function uploadToSupabase(techMap,filename){
 
     // Insertar en batches de 500
     const BATCH=500;
-    for(let i=0;i<rows.length;i+=BATCH){
+    const total=rows.length;
+    for(let i=0;i<total;i+=BATCH){
       const{error}=await _sb.from('orders').insert(rows.slice(i,i+BATCH));
       if(error)throw error;
-      setSbStatus(`Subiendo… ${Math.min(i+BATCH,rows.length).toLocaleString()}/${rows.length.toLocaleString()}`,null);
+      const done=Math.min(i+BATCH,total);
+      const pct=Math.round(done/total*100);
+      setSbStatus(`Subiendo… ${done.toLocaleString()}/${total.toLocaleString()} (${pct}%)`,null);
     }
-    setSbStatus(`✓ ${rows.length.toLocaleString()} órdenes guardadas en Supabase`,true);
+
+    setSbStatus(`✓ ${total.toLocaleString()} órdenes guardadas — recargando…`,null);
+
+    // Recargar desde Supabase automáticamente para garantizar consistencia
+    await loadFromSupabase();
+
   }catch(err){
     setSbStatus('Error al subir: '+err.message,false);
     console.error('Supabase upload error:',err);
+  }finally{
+    // Desbloquear botones
+    if(sbBtn){sbBtn.disabled=false;sbBtn.style.opacity='';}
+    if(delBtn){delBtn.disabled=false;delBtn.style.opacity='';}
   }
 }
 
