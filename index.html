@@ -1018,6 +1018,7 @@ async function loadFromSupabase(){
     }
 
     const techMap={};
+    const seenOTs_sb=new Set(); // dedup: misma OT no puede contarse dos veces
     let minDate=null,maxDate=null;
     all.forEach(row=>{
       const techKey=row.ffm||row.nombre;
@@ -1031,6 +1032,9 @@ async function loadFromSupabase(){
       if(row.coord&&!techMap[techKey].coord)techMap[techKey].coord=row.coord;
       const wk=row.semana||weekKey(fecha);
       const dia=row.dia||fecha.toISOString().slice(0,10);
+      // Dedup por OT
+      const otKey=row.ot_num||row.os_num;
+      if(otKey){if(seenOTs_sb.has(otKey))return;seenOTs_sb.add(otKey);}
       techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:row.os_num||'',ot:row.ot_num||'',wk,dia});
       if(!minDate||fecha<minDate)minDate=fecha;
       if(!maxDate||fecha>maxDate)maxDate=fecha;
@@ -1241,10 +1245,13 @@ async function uploadToSupabase(techMap,filename){
       if(delErr)throw delErr;
     }
 
-    // Construir filas
+    // Construir filas (dedup por OT para garantizar que la BD queda limpia)
     const rows=[];
+    const seenUpload=new Set();
     Object.values(techMap).forEach(tech=>{
       tech.orders.forEach(o=>{
+        const otKey=o.ot||o.os;
+        if(otKey){if(seenUpload.has(otKey))return;seenUpload.add(otKey);}
         rows.push({ffm:tech.ffm,nombre:tech.nombre,distrito:tech.dist,skill:tech.skill,
           coord:tech.coord,fecha:o.dia,tipo:o.tipo,os_num:o.os,ot_num:o.ot,semana:o.wk,dia:o.dia});
       });
@@ -1484,9 +1491,10 @@ function generateData(wk){
 // ═══════════════════════════════════════════
 // FORMATTERS
 // ═══════════════════════════════════════════
-const f$=n=>'$'+n.toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
-const fM=n=>'$'+(n/1000000).toFixed(1)+'M';
-const fk=n=>{if(n>=1000000)return '$'+(n/1000).toFixed(0)+'k';if(n>=1000)return '$'+(n/1000).toFixed(1)+'k';return '$'+Math.round(n);};
+const f$=n=>{if(n===null||n===undefined||isNaN(n))return '$0';return '$'+Math.round(n).toLocaleString('es-MX');};
+const fBubble=n=>{if(!n&&n!==0)return '$0';const abs=Math.abs(n),sign=n<0?'−':'';if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(2)+'M';if(abs>=1e3)return sign+'$'+(abs/1e3).toFixed(2)+'k';return sign+'$'+Math.round(abs);};
+const fM=n=>f$(n);
+const fk=n=>f$(n);
 const fp=n=>n.toFixed(1)+'%';
 const distShort=d=>d.replace('CTA-TPI-INT-','');
 function initials(n){const p=n.split(' ');return((p[0]||'')[0]+(p[1]||'')[0]).toUpperCase();}
@@ -1558,7 +1566,7 @@ function renderNacional(){
 
   document.getElementById('kpi-nacional').innerHTML=`
     <div class="kpi-c hl"><div class="kpi-label" style="color:var(--or)"><svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>MONTO TOTAL BONOS</div>
-      <div class="kpi-val or">${fk(totalBonos)}</div>
+      <div class="kpi-val or">${fBubble(totalBonos)}</div>
       <div class="kpi-sub" style="color:var(--text3)">${total} técnicos en período</div></div>
 
     <div class="kpi-c"><div class="kpi-label"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>CUADRILLAS ACTIVAS</div>
@@ -3189,6 +3197,7 @@ function processWorkbook(wb,filename){
 
   // ── PASO 1: leer todas las órdenes → techMap ─────────────────────────────
   const techMap={};
+  const seenOTs=new Set(); // dedup global: una OT no puede contarse dos veces
   let minDate=null, maxDate=null;
 
   dataRows.forEach(row=>{
@@ -3218,6 +3227,10 @@ function processWorkbook(wb,filename){
     if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[]};
     if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
     if(coordNom&&!techMap[techKey].coord)techMap[techKey].coord=coordNom;
+
+    // Dedup por OT: si ya se procesó esta OT, se ignora (Field Cloud puede enviar duplicados)
+    const otKey=otNum||osNum;
+    if(otKey){if(seenOTs.has(otKey))return;seenOTs.add(otKey);}
 
     // Guardamos tipo (no puntos) → los puntos se calculan en rebuildFromRawOrders con SERVICIOS actuales
     techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
