@@ -1035,7 +1035,14 @@ async function loadFromSupabase(){
       const dia=row.dia||fecha.toISOString().slice(0,10);
       // Dedup por OT
       const otKey=row.ot_num||row.os_num;
-      if(otKey){if(seenOTs_sb.has(otKey)){_dbg_dupOT++;return;}seenOTs_sb.add(otKey);}
+      if(otKey){
+        if(seenOTs_sb.has(otKey)){
+          _dbg_dupOT++;
+          if(_dbg_dupOT<=5)console.log(`[SB-LOAD-DUP #${_dbg_dupOT}] key="${otKey}" ot_num=${JSON.stringify(row.ot_num)} os_num=${JSON.stringify(row.os_num)} semana=${row.semana} ffm=${row.ffm}`);
+          return;
+        }
+        seenOTs_sb.add(otKey);
+      }
       techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:row.os_num||'',ot:row.ot_num||'',wk,dia});
       if(!minDate||fecha<minDate)minDate=fecha;
       if(!maxDate||fecha>maxDate)maxDate=fecha;
