@@ -1052,9 +1052,9 @@ async function loadFromSupabase(){
     if(window._currentRealWk)weekSel.value='WK_'+(allWeeks.length-1);
     window._periodWeeks=1;
 
-    // Cargar config de Supabase antes de recalcular
+    // Config ya se inició al arrancar — esperar que esté lista
     setSbStatus('Cargando configuración…',null);
-    await loadConfig();
+    await _configReady;
     rebuildFromRawOrders();
     const nT=Object.keys(techMap).length;
     const slEl=document.getElementById('source-label');
@@ -1180,7 +1180,8 @@ async function persistConfigToSupabase(){
     if(e6)throw e6;
 
     // Recargar config vigente y recalcular
-    await loadConfig();
+    _configReady = loadConfig();
+    await _configReady;
     if(window._techMap)rebuildFromRawOrders();
     renderAll();
     renderConfig();
@@ -1290,6 +1291,12 @@ async function uploadToSupabase(techMap,filename){
     if(delBtn){delBtn.disabled=false;delBtn.style.opacity='';}
   }
 }
+
+// ═══════════════════════════════════════════
+// CONFIG PROMISE — garantiza que ambas rutas (Excel y Supabase)
+// usen exactamente el mismo METAS antes de calcular bonos.
+// ═══════════════════════════════════════════
+let _configReady = null;
 
 // ═══════════════════════════════════════════
 // CONSTANTS
@@ -3158,10 +3165,10 @@ function loadExcelFile(input){
   if(!file)return;
   document.getElementById('load-btn-label').textContent='Cargando…';
   const reader=new FileReader();
-  reader.onload=e=>{
+  reader.onload=async e=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
-      processWorkbook(wb,file.name);
+      await processWorkbook(wb,file.name);
     }catch(err){
       alert('Error al leer el archivo: '+err.message);
       document.getElementById('load-btn-label').textContent='Cargar Excel';
@@ -3170,7 +3177,7 @@ function loadExcelFile(input){
   reader.readAsArrayBuffer(file);
 }
 
-function processWorkbook(wb,filename){
+async function processWorkbook(wb,filename){
   const sheetName=wb.SheetNames[0];
   const ws=wb.Sheets[sheetName];
 
@@ -3277,6 +3284,8 @@ function processWorkbook(wb,filename){
   window._periodWeeks=1;
 
   // ── PASO 2: agregar y calcular bonos usando Ajustes actuales ─────────────
+  // Esperar config (misma que usa loadFromSupabase — garantiza resultados idénticos)
+  await _configReady;
   rebuildFromRawOrders();
 
   const nTecs=Object.keys(techMap).length;
@@ -3951,6 +3960,8 @@ allData=[];
 coordData=[];
 renderNacional();
 renderConfig();
+// Iniciar carga de config antes que los datos — garantiza METAS idénticos en ambas rutas
+_configReady = loadConfig();
 loadFromSupabase();
 </script>
 
