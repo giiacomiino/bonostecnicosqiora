@@ -259,14 +259,22 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
 /* QiORA AI */
-.ai-chip{background:white;border:1.5px solid #e5e7eb;border-radius:20px;padding:6px 14px;font-family:'Inter',sans-serif;font-size:12px;color:var(--text2);cursor:pointer;transition:all .12s;text-align:left}
-.ai-chip:hover{border-color:var(--or);color:var(--or);background:var(--or-light)}
-.ai-bubble-user{align-self:flex-end;background:var(--or);color:white;border-radius:16px 16px 4px 16px;padding:10px 16px;max-width:78%;font-size:13px;line-height:1.55;white-space:pre-wrap}
-.ai-bubble-ai{align-self:flex-start;background:white;border:1.5px solid #e5e7eb;border-radius:16px 16px 16px 4px;padding:14px 18px;max-width:90%;font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap}
-.ai-bubble-ai strong{color:var(--or);font-weight:700}
-.ai-thinking{align-self:flex-start;color:var(--text3);font-size:12px;font-style:italic;display:flex;align-items:center;gap:6px}
-.ai-thinking::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--or);animation:aipulse 1s infinite}
-@keyframes aipulse{0%,100%{opacity:.3}50%{opacity:1}}
+#view-ai.active{display:flex!important;flex-direction:column}
+.ai-sug-card{background:white;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;text-align:left;display:flex;align-items:flex-start;gap:10px;line-height:1.5}
+.ai-sug-card:hover{border-color:var(--or);color:var(--text);box-shadow:0 4px 16px rgba(232,84,32,.12);transform:translateY(-1px)}
+.ai-sug-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.ai-bubble-user{align-self:flex-end;background:linear-gradient(135deg,#E85420,#ff7c4d);color:white;border-radius:18px 18px 4px 18px;padding:11px 16px;max-width:75%;font-size:13px;line-height:1.6;white-space:pre-wrap;box-shadow:0 4px 16px rgba(232,84,32,.25)}
+.ai-bubble-wrap{display:flex;align-items:flex-start;gap:10px;max-width:88%}
+.ai-avatar{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#1a1a2e,#0f3460);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.ai-bubble-ai{background:white;border:1.5px solid #e2e8f0;border-radius:4px 18px 18px 18px;padding:13px 16px;font-size:13px;line-height:1.75;color:var(--text);white-space:pre-wrap;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.ai-bubble-ai strong{color:#1a1a2e;font-weight:700}
+.ai-bubble-ai h3{font-size:13px;font-weight:700;color:#1a1a2e;margin:10px 0 4px}
+.ai-thinking-wrap{display:flex;align-items:center;gap:10px}
+.ai-dots{display:flex;gap:4px;padding:12px 16px;background:white;border:1.5px solid #e2e8f0;border-radius:4px 18px 18px 18px}
+.ai-dots span{width:7px;height:7px;border-radius:50%;background:#cbd5e1;animation:aidot 1.2s infinite}
+.ai-dots span:nth-child(2){animation-delay:.2s}
+.ai-dots span:nth-child(3){animation-delay:.4s}
+@keyframes aidot{0%,60%,100%{transform:translateY(0);background:#cbd5e1}30%{transform:translateY(-6px);background:var(--or)}}
 </style>
 </head>
 <body>
@@ -978,77 +986,108 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     </div><!-- /calculo -->
 
     <!-- ══════ VIEW: QIORA AI ══════ -->
-    <div class="view" id="view-ai">
-      <!-- Header -->
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
-        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#E85420,#ff7c4d);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
-        </div>
-        <div>
-          <div style="font-size:20px;font-weight:700;color:var(--text)">QiORA AI</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px">Análisis operativo inteligente · Powered by Gemini</div>
-        </div>
-        <div style="margin-left:auto">
-          <span id="ai-status-badge" style="display:none;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#d1fae5;color:#065f46">● Conectado</span>
+    <div class="view" id="view-ai" style="display:none;flex-direction:column;height:calc(100vh - 110px)">
+
+      <!-- Hero banner -->
+      <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);border-radius:16px;padding:24px 28px;margin-bottom:18px;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-30px;right:-30px;width:180px;height:180px;border-radius:50%;background:rgba(232,84,32,.15)"></div>
+        <div style="position:absolute;bottom:-50px;right:80px;width:120px;height:120px;border-radius:50%;background:rgba(232,84,32,.08)"></div>
+        <div style="display:flex;align-items:center;gap:16px;position:relative">
+          <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#E85420,#ff9a6c);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 8px 24px rgba(232,84,32,.4)">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:22px;font-weight:800;color:white;letter-spacing:-.3px">QiORA AI</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:2px">Análisis operativo inteligente · Powered by Gemini</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span id="ai-status-badge" style="display:none;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;background:rgba(52,211,153,.15);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)">● Listo</span>
+            <button onclick="toggleAISettings()" id="ai-settings-btn" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);border-radius:8px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;backdrop-filter:blur(4px)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41"/></svg>
+              Configurar
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- API Key config -->
-      <div id="ai-key-panel" style="background:#fff8f5;border:1.5px solid rgba(232,84,32,.2);border-radius:12px;padding:16px 20px;margin-bottom:20px">
-        <div style="font-size:12px;font-weight:600;color:var(--or);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Configuración</div>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-          <input id="ai-key-input" type="password" placeholder="Pega tu API key de Google Cloud (proyecto con billing habilitado)…"
-            style="flex:1;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-family:'Inter',sans-serif;font-size:13px;outline:none;color:var(--text)"
-            oninput="aiKeyChanged()">
-          <select id="ai-model-sel" style="border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 10px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);background:white;cursor:pointer;outline:none">
+      <!-- Settings panel (collapsible) -->
+      <div id="ai-key-panel" style="display:none;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px 18px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">API Key · Modelo</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="position:relative;flex:1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%)"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            <input id="ai-key-input" type="password" placeholder="Pega tu Gemini API key…"
+              style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 12px 9px 32px;font-family:'Inter',sans-serif;font-size:13px;outline:none;color:var(--text);box-sizing:border-box"
+              oninput="aiKeyChanged()">
+          </div>
+          <select id="ai-model-sel" style="border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 10px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);background:white;cursor:pointer;outline:none;min-width:160px">
             <option value="gemini-2.5-flash-preview-05-20" selected>Gemini 2.5 Flash</option>
             <option value="gemini-2.5-pro-preview-05-06">Gemini 2.5 Pro</option>
             <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</option>
             <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
           </select>
-          <button onclick="saveAIKey()" style="background:var(--or);color:white;border:none;border-radius:8px;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Guardar</button>
-          <button onclick="clearAIKey()" style="background:#f3f4f6;color:var(--text2);border:none;border-radius:8px;padding:9px 14px;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">Limpiar</button>
+          <button onclick="saveAIKey(event)" style="background:var(--or);color:white;border:none;border-radius:8px;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Guardar</button>
+          <button onclick="clearAIKey()" style="background:#f3f4f6;color:var(--text2);border:none;border-radius:8px;padding:9px 12px;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">✕</button>
         </div>
-        <div style="font-size:11px;color:var(--text3)">Key de <strong>Google Cloud Console</strong> (proyecto con billing activo) — no de AI Studio free tier. Se guarda solo en este navegador.</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:8px">Key guardada solo en este navegador · nunca se envía a servidores de QiORA</div>
       </div>
 
-      <!-- Suggested questions -->
-      <div style="margin-bottom:16px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Preguntas sugeridas</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px" id="ai-chips">
-          <button class="ai-chip" onclick="aiChip(this)">¿Qué distrito tuvo peor desempeño constante en las últimas 8 semanas?</button>
-          <button class="ai-chip" onclick="aiChip(this)">¿Por qué aumentaron los bonos entre la última semana de 2025 y la primera de 2026?</button>
-          <button class="ai-chip" onclick="aiChip(this)">¿Qué técnicos tuvieron bono $0 más de 3 semanas seguidas?</button>
-          <button class="ai-chip" onclick="aiChip(this)">Resume el desempeño de las últimas 4 semanas por distrito</button>
-          <button class="ai-chip" onclick="aiChip(this)">¿Cuál es el distrito con mayor productividad promedio?</button>
-          <button class="ai-chip" onclick="aiChip(this)">¿Qué cuadrillas tipo Moto están por debajo de meta consistentemente?</button>
+      <!-- Suggested questions grid -->
+      <div id="ai-suggestions" style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Preguntas sugeridas</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="ai-sug-card" onclick="aiChip(this)">
+            <div class="ai-sug-icon" style="background:#fff3ee">📊</div>
+            <div>¿Qué distrito tuvo peor desempeño constante en las últimas 8 semanas?</div>
+          </button>
+          <button class="ai-sug-card" onclick="aiChip(this)">
+            <div class="ai-sug-icon" style="background:#fef9ee">📈</div>
+            <div>¿Por qué aumentaron los bonos entre la última semana de 2025 y la primera de 2026?</div>
+          </button>
+          <button class="ai-sug-card" onclick="aiChip(this)">
+            <div class="ai-sug-icon" style="background:#fef2f2">⚠️</div>
+            <div>¿Qué técnicos tuvieron bono $0 más de 3 semanas seguidas?</div>
+          </button>
+          <button class="ai-sug-card" onclick="aiChip(this)">
+            <div class="ai-sug-icon" style="background:#f0fdf4">🏆</div>
+            <div>¿Cuál es el distrito con mayor productividad promedio en el último mes?</div>
+          </button>
+          <button class="ai-sug-card" onclick="aiChip(this)">
+            <div class="ai-sug-icon" style="background:#eff6ff">📋</div>
+            <div>Resume el desempeño nacional de las últimas 4 semanas</div>
+          </button>
+          <button class="ai-sug-card" onclick="aiChip(this)">
+            <div class="ai-sug-icon" style="background:#fdf4ff">🏍️</div>
+            <div>¿Qué cuadrillas tipo Moto están consistentemente por debajo de meta?</div>
+          </button>
         </div>
       </div>
 
       <!-- Chat area -->
-      <div id="ai-chat" style="background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:12px;min-height:340px;max-height:520px;overflow-y:auto;padding:20px;margin-bottom:12px;display:flex;flex-direction:column;gap:16px">
-        <div id="ai-welcome" style="text-align:center;margin:auto;color:var(--text3)">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" style="display:block;margin:0 auto 12px"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
-          <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:4px">Haz tu primera pregunta</div>
-          <div style="font-size:12px">Usa las sugerencias o escribe cualquier consulta sobre los datos de bonos</div>
+      <div id="ai-chat" style="flex:1;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;overflow-y:auto;padding:20px;margin-bottom:12px;display:flex;flex-direction:column;gap:16px;min-height:200px">
+        <div id="ai-welcome" style="text-align:center;margin:auto;padding:20px 0;color:var(--text3)">
+          <div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#1a1a2e,#0f3460);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.8"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
+          </div>
+          <div style="font-size:15px;font-weight:700;color:var(--text2);margin-bottom:6px">¿En qué te ayudo hoy?</div>
+          <div style="font-size:12px;max-width:280px;margin:0 auto;line-height:1.6">Analizo los datos de bonos en tiempo real. Selecciona una pregunta sugerida o escribe la tuya.</div>
         </div>
       </div>
 
-      <!-- Input -->
-      <div style="display:flex;gap:8px;align-items:flex-end">
-        <textarea id="ai-input" rows="2" placeholder="Escribe tu pregunta sobre los datos de bonos…"
-          style="flex:1;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Inter',sans-serif;font-size:13px;resize:none;outline:none;color:var(--text);line-height:1.5"
+      <!-- Input bar -->
+      <div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:10px 10px 10px 16px;display:flex;gap:8px;align-items:flex-end;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+        <textarea id="ai-input" rows="1" placeholder="Escribe tu pregunta…"
+          style="flex:1;border:none;font-family:'Inter',sans-serif;font-size:13px;resize:none;outline:none;color:var(--text);line-height:1.6;max-height:120px;background:transparent"
           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI()}"
-          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
         <button id="ai-send-btn" onclick="sendAI()"
-          style="background:var(--or);color:white;border:none;border-radius:10px;padding:10px 20px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;height:42px;white-space:nowrap;display:flex;align-items:center;gap:6px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          Enviar
+          style="background:linear-gradient(135deg,#E85420,#ff7c4d);color:white;border:none;border-radius:10px;width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 12px rgba(232,84,32,.35);transition:all .15s">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px">Enter para enviar · Shift+Enter para nueva línea · Los datos se agregan localmente antes de enviarse</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:6px;text-align:center">Enter para enviar · Shift+Enter para nueva línea · Datos procesados localmente</div>
+
     </div><!-- /ai -->
 
   </div><!-- /content -->
@@ -4108,36 +4147,46 @@ function initAI(){
   }
 }
 
+function toggleAISettings(){
+  const panel=document.getElementById('ai-key-panel');
+  panel.style.display=panel.style.display==='none'?'block':'none';
+}
+
 function aiKeyChanged(){
   const v=document.getElementById('ai-key-input').value.trim();
   updateAIBadge(!!v);
 }
 
-function saveAIKey(){
+function saveAIKey(ev){
   const v=document.getElementById('ai-key-input').value.trim();
   if(!v){alert('Pega una API key válida primero.');return;}
   localStorage.setItem('qiora_gemini_key',v);
   const model=document.getElementById('ai-model-sel').value;
   localStorage.setItem('qiora_gemini_model',model);
   updateAIBadge(true);
-  const btn=event.target;
+  const btn=ev?.target||document.querySelector('#ai-key-panel button');
+  const orig=btn.textContent;
   btn.textContent='✓ Guardada';
-  setTimeout(()=>btn.textContent='Guardar',1800);
+  setTimeout(()=>btn.textContent=orig,1800);
+  document.getElementById('ai-key-panel').style.display='none';
 }
 
 function clearAIKey(){
   localStorage.removeItem('qiora_gemini_key');
+  localStorage.removeItem('qiora_gemini_model');
   document.getElementById('ai-key-input').value='';
   updateAIBadge(false);
 }
 
 function updateAIBadge(ok){
   const b=document.getElementById('ai-status-badge');
-  b.style.display=ok?'inline-block':'none';
+  b.style.display=ok?'inline-flex':'none';
 }
 
 function aiChip(el){
-  document.getElementById('ai-input').value=el.textContent.trim();
+  const q=el.querySelector('div:last-child')?.textContent||el.textContent;
+  document.getElementById('ai-input').value=q.trim();
+  document.getElementById('ai-suggestions').style.display='none';
   sendAI();
 }
 
@@ -4235,34 +4284,47 @@ function buildAIContext(){
 }
 
 // ── Render de burbujas de chat ───────────────────────────────────────────────
+function fmtAIText(raw){
+  return raw
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm,'<strong style="display:block;margin:10px 0 4px;color:#1a1a2e">$1</strong>')
+    .replace(/^## (.+)$/gm,'<strong style="display:block;margin:10px 0 4px;color:#1a1a2e;font-size:14px">$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`(.+?)`/g,'<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11px;font-family:monospace">$1</code>')
+    .replace(/^[\-\*] (.+)$/gm,'<div style="padding:2px 0 2px 14px;position:relative"><span style="position:absolute;left:0;color:var(--or);font-weight:700">▸</span>$1</div>')
+    .replace(/\n{2,}/g,'<br><br>').replace(/\n/g,'<br>');
+}
+
 function addBubble(type,text){
   const chat=document.getElementById('ai-chat');
-  const welcome=document.getElementById('ai-welcome');
-  if(welcome)welcome.remove();
+  document.getElementById('ai-welcome')?.remove();
 
-  const div=document.createElement('div');
-  div.className=type==='user'?'ai-bubble-user':type==='thinking'?'ai-thinking':'ai-bubble-ai';
-  if(type==='thinking'){
-    div.id='ai-thinking-bubble';
-    div.textContent='QiORA AI está analizando…';
+  if(type==='user'){
+    const div=document.createElement('div');
+    div.className='ai-bubble-user';
+    div.textContent=text;
+    chat.appendChild(div);
+  } else if(type==='thinking'){
+    const wrap=document.createElement('div');
+    wrap.className='ai-thinking-wrap';
+    wrap.id='ai-thinking-bubble';
+    wrap.innerHTML=`<div class="ai-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg></div><div class="ai-dots"><span></span><span></span><span></span></div>`;
+    chat.appendChild(wrap);
   } else {
-    // Formato básico: **bold** y saltos de línea
-    div.innerHTML=text
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-      .replace(/\n/g,'<br>');
+    const wrap=document.createElement('div');
+    wrap.className='ai-bubble-wrap';
+    wrap.innerHTML=`<div class="ai-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="2"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg></div><div class="ai-bubble-ai">${fmtAIText(text)}</div>`;
+    chat.appendChild(wrap);
   }
-  chat.appendChild(div);
   chat.scrollTop=chat.scrollHeight;
-  return div;
 }
 
 // ── Llamada a Gemini ─────────────────────────────────────────────────────────
 async function sendAI(){
   const key=(localStorage.getItem('qiora_gemini_key')||'').trim();
   if(!key){
-    alert('Primero guarda tu Gemini API key en el panel de arriba.');
-    nav('ai',document.querySelector('.nav-i[onclick*="ai"]'));
+    document.getElementById('ai-key-panel').style.display='block';
+    document.getElementById('ai-key-input').focus();
     return;
   }
   const input=document.getElementById('ai-input');
@@ -4272,33 +4334,39 @@ async function sendAI(){
   const btn=document.getElementById('ai-send-btn');
   btn.disabled=true;btn.style.opacity='0.5';
   input.value='';input.style.height='auto';
+  document.getElementById('ai-suggestions').style.display='none';
 
   addBubble('user',question);
   addBubble('thinking');
 
   const dataCtx=buildAIContext();
-
-  const userMessage=`## PREGUNTA DEL USUARIO\n${question}\n\n## DATOS DISPONIBLES\n${dataCtx}`;
+  const model=document.getElementById('ai-model-sel').value||'gemini-2.5-flash-preview-05-20';
 
   try{
-    const model=document.getElementById('ai-model-sel').value||'gemini-2.0-flash';
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),90000);
     const resp=await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},
+      {method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,
        body:JSON.stringify({
          system_instruction:{parts:[{text:AI_SYSTEM_PROMPT}]},
-         contents:[{role:'user',parts:[{text:userMessage}]}],
-         generationConfig:{temperature:0.3,maxOutputTokens:2048}
+         contents:[{role:'user',parts:[{text:`${question}\n\n---\nDATOS:\n${dataCtx}`}]}],
+         generationConfig:{temperature:0.3,maxOutputTokens:3000}
        })}
     );
+    clearTimeout(timer);
     const json=await resp.json();
     if(!resp.ok)throw new Error(json.error?.message||`HTTP ${resp.status}`);
-    const answer=json.candidates?.[0]?.content?.parts?.[0]?.text||'Sin respuesta.';
+    const answer=json.candidates?.[0]?.content?.parts?.[0]?.text
+      ||(json.error?`Error API: ${json.error.message}`:'Sin respuesta del modelo.');
     document.getElementById('ai-thinking-bubble')?.remove();
     addBubble('ai',answer);
   }catch(err){
     document.getElementById('ai-thinking-bubble')?.remove();
-    addBubble('ai',`Error al conectar con Gemini: ${err.message}\n\nVerifica que tu API key sea válida y tenga acceso a Gemini 2.0 Flash.`);
+    const msg=err.name==='AbortError'
+      ?'Tiempo de espera agotado (90s). El modelo puede estar tardando, intenta de nuevo.'
+      :`**Error al conectar con Gemini:**\n${err.message}`;
+    addBubble('ai',msg);
   }finally{
     btn.disabled=false;btn.style.opacity='';
   }
