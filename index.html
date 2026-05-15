@@ -258,6 +258,15 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
+/* QiORA AI */
+.ai-chip{background:white;border:1.5px solid #e5e7eb;border-radius:20px;padding:6px 14px;font-family:'Inter',sans-serif;font-size:12px;color:var(--text2);cursor:pointer;transition:all .12s;text-align:left}
+.ai-chip:hover{border-color:var(--or);color:var(--or);background:var(--or-light)}
+.ai-bubble-user{align-self:flex-end;background:var(--or);color:white;border-radius:16px 16px 4px 16px;padding:10px 16px;max-width:78%;font-size:13px;line-height:1.55;white-space:pre-wrap}
+.ai-bubble-ai{align-self:flex-start;background:white;border:1.5px solid #e5e7eb;border-radius:16px 16px 16px 4px;padding:14px 18px;max-width:90%;font-size:13px;line-height:1.7;color:var(--text);white-space:pre-wrap}
+.ai-bubble-ai strong{color:var(--or);font-weight:700}
+.ai-thinking{align-self:flex-start;color:var(--text3);font-size:12px;font-style:italic;display:flex;align-items:center;gap:6px}
+.ai-thinking::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--or);animation:aipulse 1s infinite}
+@keyframes aipulse{0%,100%{opacity:.3}50%{opacity:1}}
 </style>
 </head>
 <body>
@@ -299,6 +308,11 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     <div class="nav-i" onclick="nav('config',this)">
       <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41"/></svg>
       Ajustes
+    </div>
+    <div class="s-label">Inteligencia</div>
+    <div class="nav-i" onclick="nav('ai',this)" style="background:linear-gradient(135deg,rgba(232,84,32,.12),rgba(232,84,32,.04));border:1px solid rgba(232,84,32,.2)">
+      <svg viewBox="0 0 24 24" stroke-width="2" fill="none" stroke="currentColor"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
+      QiORA AI
     </div>
   </div>
 
@@ -963,6 +977,72 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       </div>
     </div><!-- /calculo -->
 
+    <!-- ══════ VIEW: QIORA AI ══════ -->
+    <div class="view" id="view-ai">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#E85420,#ff7c4d);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:700;color:var(--text)">QiORA AI</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">Análisis operativo inteligente · Powered by Gemini</div>
+        </div>
+        <div style="margin-left:auto">
+          <span id="ai-status-badge" style="display:none;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#d1fae5;color:#065f46">● Conectado</span>
+        </div>
+      </div>
+
+      <!-- API Key config -->
+      <div id="ai-key-panel" style="background:#fff8f5;border:1.5px solid rgba(232,84,32,.2);border-radius:12px;padding:16px 20px;margin-bottom:20px">
+        <div style="font-size:12px;font-weight:600;color:var(--or);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Gemini API Key</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="ai-key-input" type="password" placeholder="Pega tu API key de Google AI Studio…"
+            style="flex:1;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-family:'Inter',sans-serif;font-size:13px;outline:none;color:var(--text)"
+            oninput="aiKeyChanged()">
+          <button onclick="saveAIKey()" style="background:var(--or);color:white;border:none;border-radius:8px;padding:9px 18px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Guardar</button>
+          <button onclick="clearAIKey()" style="background:#f3f4f6;color:var(--text2);border:none;border-radius:8px;padding:9px 14px;font-family:'Inter',sans-serif;font-size:13px;cursor:pointer">Limpiar</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">La key se guarda solo en este navegador (localStorage). Nunca se envía a ningún servidor nuestro.</div>
+      </div>
+
+      <!-- Suggested questions -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Preguntas sugeridas</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px" id="ai-chips">
+          <button class="ai-chip" onclick="aiChip(this)">¿Qué distrito tuvo peor desempeño constante en las últimas 8 semanas?</button>
+          <button class="ai-chip" onclick="aiChip(this)">¿Por qué aumentaron los bonos entre la última semana de 2025 y la primera de 2026?</button>
+          <button class="ai-chip" onclick="aiChip(this)">¿Qué técnicos tuvieron bono $0 más de 3 semanas seguidas?</button>
+          <button class="ai-chip" onclick="aiChip(this)">Resume el desempeño de las últimas 4 semanas por distrito</button>
+          <button class="ai-chip" onclick="aiChip(this)">¿Cuál es el distrito con mayor productividad promedio?</button>
+          <button class="ai-chip" onclick="aiChip(this)">¿Qué cuadrillas tipo Moto están por debajo de meta consistentemente?</button>
+        </div>
+      </div>
+
+      <!-- Chat area -->
+      <div id="ai-chat" style="background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:12px;min-height:340px;max-height:520px;overflow-y:auto;padding:20px;margin-bottom:12px;display:flex;flex-direction:column;gap:16px">
+        <div id="ai-welcome" style="text-align:center;margin:auto;color:var(--text3)">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="1.5" style="display:block;margin:0 auto 12px"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
+          <div style="font-size:14px;font-weight:600;color:var(--text2);margin-bottom:4px">Haz tu primera pregunta</div>
+          <div style="font-size:12px">Usa las sugerencias o escribe cualquier consulta sobre los datos de bonos</div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <textarea id="ai-input" rows="2" placeholder="Escribe tu pregunta sobre los datos de bonos…"
+          style="flex:1;border:1.5px solid #e5e7eb;border-radius:10px;padding:10px 14px;font-family:'Inter',sans-serif;font-size:13px;resize:none;outline:none;color:var(--text);line-height:1.5"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI()}"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+        <button id="ai-send-btn" onclick="sendAI()"
+          style="background:var(--or);color:white;border:none;border-radius:10px;padding:10px 20px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;height:42px;white-space:nowrap;display:flex;align-items:center;gap:6px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Enviar
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Enter para enviar · Shift+Enter para nueva línea · Los datos se agregan localmente antes de enviarse</div>
+    </div><!-- /ai -->
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -1547,6 +1627,7 @@ const TITLES={
   tecnicos:['Técnicos','Detalle individual'],
   calculo:['Cálculo de Bonos','Desglose por técnico'],
   config:['Configuración','Reglas y esquemas'],
+  ai:['QiORA AI','Análisis operativo inteligente'],
 };
 function nav(id,el){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -3946,6 +4027,266 @@ renderConfig();
 // Iniciar carga de config antes que los datos — garantiza METAS idénticos en ambas rutas
 _configReady = loadConfig();
 loadFromSupabase();
+initAI();
+
+// ═══════════════════════════════════════════
+// QIORA AI — Gemini Integration
+// ═══════════════════════════════════════════
+
+const AI_SYSTEM_PROMPT = `Eres QiORA AI, un analista de operaciones especializado en el sistema de bonos de técnicos de TotalPlay para QiORA (empresa contratista). Tu rol es interpretar datos operativos reales y responder preguntas con criterio de negocio.
+
+## CONTEXTO DEL NEGOCIO
+
+**QiORA** es contratista de TotalPlay. Sus técnicos instalan, dan soporte y mantenimiento de fibra óptica. Hay ~800-900 técnicos activos semanalmente organizados en cuadrillas.
+
+### Jerarquía
+Técnicos → Coordinadores (~15-20 técnicos c/u) → Líderes Distritales → Divisionales → Nacional
+
+### 17 Distritos en 3 tipos (A / B / C)
+- Tipo A: GDL BARRANCA, GDL PRIMAVERA, GDL ESTADIO, GDL LOPEZ MATEOS — meta normal 75-90 estrellas
+- Tipo B: CANCUN, VERACRUZ, TUXTLA, XALAPA, MERIDA, IRAPUATO, LEON, MORELIA, PUEBLA, CORDOBA, AGUASCALIENTES, TEPIC — meta normal 75-84 estrellas
+- Tipo C: COLIMA — meta 90 estrellas
+- Los distritos Tipo A tienen bonos más altos
+
+### Tipos de cuadrilla
+Normal, Moto (meta más baja ~60-70 estrellas), Híbrida (si ≥70% de OS son mantenimiento), Elite, Multidistrito
+
+### Puntaje por tipo de servicio (estrellas)
+Instalación=6, Soporte=3, Mantenimiento Mayor=4, Mantenimiento=3, Cambio Domicilio=6, Empresarial=8, Instalación Empresarial=8, Soporte Empresarial=5, Addons=2, Cambio Equipo=2, Cambio Plan=2, Recolección=1, Factibilidad=1
+
+### Estructura de bonos base
+| Tipo | 80-89% meta | 90-99% meta | 100%+ meta |
+|------|-------------|-------------|------------|
+| A    | $500        | $900        | $2,500     |
+| B    | $450        | $800        | $1,800     |
+| C    | $300        | $700        | $1,400     |
+
+### Bono extra (bono 110%)
+- Tipo A: $500 fijo si alcanza ≥110% de meta
+- Tipo B/C: $100 por cada bloque de 6 estrellas sobre la meta base (máx $500)
+
+### Descuentos por inasistencia
+Solo en 7 distritos: VERACRUZ, IRAPUATO, LEON, GDL BARRANCA, GDL PRIMAVERA, GDL ESTADIO, GDL LOPEZ MATEOS
+- 6 días trabajados = sin descuento
+- 5 días = 50% del bono total
+- ≤4 días = pierde todo el bono (100% descuento)
+- Semana laboral = lunes a domingo, 1 día de descanso permitido (cualquier día)
+
+## DATOS QUE RECIBIRÁS
+Los datos ya están calculados y agregados. Incluyen:
+- Resumen semanal nacional (total bonos, técnicos activos, % meta promedio, distribución por tier)
+- Resumen por distrito × semana (bonos, técnicos, productividad, % alcance de meta)
+- Técnicos con bono $0 recurrente
+- Top e historial por distrito
+
+## INSTRUCCIONES DE RESPUESTA
+- Responde en español, tono profesional pero directo
+- Usa los datos reales provistos para justificar cualquier conclusión
+- Si detectas anomalías, explica causa probable y recomendación operativa
+- Usa listas y negritas para mejor legibilidad
+- Si la pregunta no puede responderse con los datos disponibles, dilo claramente
+- Redondea montos a pesos enteros, porcentajes a 1 decimal`;
+
+function initAI(){
+  const saved=localStorage.getItem('qiora_gemini_key');
+  if(saved){
+    document.getElementById('ai-key-input').value=saved;
+    updateAIBadge(true);
+  }
+}
+
+function aiKeyChanged(){
+  const v=document.getElementById('ai-key-input').value.trim();
+  updateAIBadge(!!v);
+}
+
+function saveAIKey(){
+  const v=document.getElementById('ai-key-input').value.trim();
+  if(!v){alert('Pega una API key válida primero.');return;}
+  localStorage.setItem('qiora_gemini_key',v);
+  updateAIBadge(true);
+  const btn=event.target;
+  btn.textContent='✓ Guardada';
+  setTimeout(()=>btn.textContent='Guardar',1800);
+}
+
+function clearAIKey(){
+  localStorage.removeItem('qiora_gemini_key');
+  document.getElementById('ai-key-input').value='';
+  updateAIBadge(false);
+}
+
+function updateAIBadge(ok){
+  const b=document.getElementById('ai-status-badge');
+  b.style.display=ok?'inline-block':'none';
+}
+
+function aiChip(el){
+  document.getElementById('ai-input').value=el.textContent.trim();
+  sendAI();
+}
+
+// ── Agregador de datos para el contexto ─────────────────────────────────────
+function buildAIContext(){
+  if(!window._allRealData||!window._allRealData.length)return'Sin datos cargados. El usuario debe subir un Excel primero.';
+
+  const data=window._allRealData;
+  const weeks=[...new Set(data.map(d=>d.wk))].sort();
+
+  // 1. Resumen semanal nacional
+  const wkNac={};
+  data.forEach(d=>{
+    if(!wkNac[d.wk])wkNac[d.wk]={wk:d.wk,bonos:0,techs:0,activos:0,sumPct:0,tier100:0,tier90:0,tier80:0,tierBajo:0,inas:0};
+    const w=wkNac[d.wk];
+    w.techs++;
+    w.bonos+=d.bonoFinal||0;
+    if((d.bonoFinal||0)>0)w.activos++;
+    w.sumPct+=(d.pct||0);
+    if(d.pct>=100)w.tier100++;
+    else if(d.pct>=90)w.tier90++;
+    else if(d.pct>=80)w.tier80++;
+    else w.tierBajo++;
+    if(d.inas>0)w.inas++;
+  });
+  const nacRows=Object.values(wkNac).sort((a,b)=>a.wk.localeCompare(b.wk));
+
+  // 2. Resumen por distrito × semana
+  const distWk={};
+  data.forEach(d=>{
+    const k=d.distrito+'||'+d.wk;
+    if(!distWk[k])distWk[k]={dist:d.distrito,tipo:d.tipoDistrito||'B',wk:d.wk,bonos:0,techs:0,sumPct:0,activos:0};
+    const w=distWk[k];
+    w.techs++;w.bonos+=d.bonoFinal||0;w.sumPct+=(d.pct||0);
+    if((d.bonoFinal||0)>0)w.activos++;
+  });
+
+  // 3. Técnicos con bono $0 recurrente (≥2 semanas)
+  const techZero={};
+  data.forEach(d=>{
+    if((d.bonoFinal||0)===0){
+      if(!techZero[d.nombre])techZero[d.nombre]={nombre:d.nombre,dist:d.distrito,semanas:[]};
+      techZero[d.nombre].semanas.push(d.wk);
+    }
+  });
+  const zeroRecurrentes=Object.values(techZero).filter(t=>t.semanas.length>=2)
+    .sort((a,b)=>b.semanas.length-a.semanas.length).slice(0,20);
+
+  // 4. Ranking de distritos por promedio de las últimas 8 semanas
+  const last8=weeks.slice(-8);
+  const distRank={};
+  data.filter(d=>last8.includes(d.wk)).forEach(d=>{
+    if(!distRank[d.distrito])distRank[d.distrito]={dist:d.distrito,tipo:d.tipoDistrito||'B',bonos:0,techs:0,sumPct:0,semanas:new Set()};
+    const r=distRank[d.distrito];
+    r.techs++;r.bonos+=d.bonoFinal||0;r.sumPct+=(d.pct||0);r.semanas.add(d.wk);
+  });
+  const distRankArr=Object.values(distRank).map(r=>({
+    dist:r.dist,tipo:r.tipo,
+    avgBonoPorTech:r.techs?Math.round(r.bonos/r.techs):0,
+    avgPct:r.techs?+(r.sumPct/r.techs).toFixed(1):0,
+    techs:r.techs,semanas:r.semanas.size
+  })).sort((a,b)=>b.avgPct-a.avgPct);
+
+  // Construir texto de contexto
+  let ctx='';
+
+  ctx+=`## DATOS ACTUALES (${weeks.length} semanas: ${weeks[0]} a ${weeks[weeks.length-1]})\n\n`;
+
+  ctx+='### Resumen semanal nacional\n';
+  ctx+='semana | techs | bonos_total | avg_pct | al_100% | 90-99% | 80-89% | <80% | con_inas\n';
+  nacRows.forEach(w=>{
+    ctx+=`${w.wk} | ${w.techs} | $${w.bonos.toLocaleString('es-MX')} | ${w.techs?(w.sumPct/w.techs).toFixed(1):0}% | ${w.tier100} | ${w.tier90} | ${w.tier80} | ${w.tierBajo} | ${w.inas}\n`;
+  });
+
+  ctx+='\n### Resumen por distrito (últimas 8 semanas — ranking por % meta promedio)\n';
+  ctx+='distrito | tipo | avg_%_meta | avg_bono/tech | techs\n';
+  distRankArr.forEach(r=>{
+    ctx+=`${r.dist.replace('CTA-TPI-INT-','')} | ${r.tipo} | ${r.avgPct}% | $${r.avgBonoPorTech.toLocaleString('es-MX')} | ${r.techs}\n`;
+  });
+
+  ctx+='\n### Detalle distrito × semana (últimas 6 semanas)\n';
+  const last6=weeks.slice(-6);
+  ctx+='distrito | semana | techs | bonos | avg_%\n';
+  Object.values(distWk).filter(d=>last6.includes(d.wk)).sort((a,b)=>a.wk.localeCompare(b.wk)||a.dist.localeCompare(b.dist)).forEach(d=>{
+    ctx+=`${d.dist.replace('CTA-TPI-INT-','')} | ${d.wk} | ${d.techs} | $${d.bonos.toLocaleString('es-MX')} | ${d.techs?(d.sumPct/d.techs).toFixed(1):0}%\n`;
+  });
+
+  if(zeroRecurrentes.length){
+    ctx+=`\n### Técnicos con bono $0 recurrente (≥2 semanas)\n`;
+    ctx+='técnico | distrito | semanas_sin_bono\n';
+    zeroRecurrentes.forEach(t=>ctx+=`${t.nombre} | ${t.dist.replace('CTA-TPI-INT-','')} | ${t.semanas.length} (${t.semanas.slice(-3).join(', ')})\n`);
+  }
+
+  return ctx;
+}
+
+// ── Render de burbujas de chat ───────────────────────────────────────────────
+function addBubble(type,text){
+  const chat=document.getElementById('ai-chat');
+  const welcome=document.getElementById('ai-welcome');
+  if(welcome)welcome.remove();
+
+  const div=document.createElement('div');
+  div.className=type==='user'?'ai-bubble-user':type==='thinking'?'ai-thinking':'ai-bubble-ai';
+  if(type==='thinking'){
+    div.id='ai-thinking-bubble';
+    div.textContent='QiORA AI está analizando…';
+  } else {
+    // Formato básico: **bold** y saltos de línea
+    div.innerHTML=text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\n/g,'<br>');
+  }
+  chat.appendChild(div);
+  chat.scrollTop=chat.scrollHeight;
+  return div;
+}
+
+// ── Llamada a Gemini ─────────────────────────────────────────────────────────
+async function sendAI(){
+  const key=(localStorage.getItem('qiora_gemini_key')||'').trim();
+  if(!key){
+    alert('Primero guarda tu Gemini API key en el panel de arriba.');
+    nav('ai',document.querySelector('.nav-i[onclick*="ai"]'));
+    return;
+  }
+  const input=document.getElementById('ai-input');
+  const question=input.value.trim();
+  if(!question)return;
+
+  const btn=document.getElementById('ai-send-btn');
+  btn.disabled=true;btn.style.opacity='0.5';
+  input.value='';input.style.height='auto';
+
+  addBubble('user',question);
+  addBubble('thinking');
+
+  const dataCtx=buildAIContext();
+
+  const userMessage=`## PREGUNTA DEL USUARIO\n${question}\n\n## DATOS DISPONIBLES\n${dataCtx}`;
+
+  try{
+    const resp=await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({
+         system_instruction:{parts:[{text:AI_SYSTEM_PROMPT}]},
+         contents:[{role:'user',parts:[{text:userMessage}]}],
+         generationConfig:{temperature:0.3,maxOutputTokens:2048}
+       })}
+    );
+    const json=await resp.json();
+    if(!resp.ok)throw new Error(json.error?.message||`HTTP ${resp.status}`);
+    const answer=json.candidates?.[0]?.content?.parts?.[0]?.text||'Sin respuesta.';
+    document.getElementById('ai-thinking-bubble')?.remove();
+    addBubble('ai',answer);
+  }catch(err){
+    document.getElementById('ai-thinking-bubble')?.remove();
+    addBubble('ai',`Error al conectar con Gemini: ${err.message}\n\nVerifica que tu API key sea válida y tenga acceso a Gemini 2.0 Flash.`);
+  }finally{
+    btn.disabled=false;btn.style.opacity='';
+  }
+}
 </script>
 
 <!-- MODAL: Exportar datos -->
