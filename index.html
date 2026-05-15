@@ -1018,14 +1018,13 @@ async function loadFromSupabase(){
     }
 
     const techMap={};
-    const seenOTs_sb=new Set(); // dedup: misma OT no puede contarse dos veces
+    const seenOTs_sb=new Set(); // safety net: descarta duplicados de OT si quedaran en Supabase
     let minDate=null,maxDate=null;
-    let _dbg_noKey=0,_dbg_badDate=0,_dbg_dupOT=0;
     all.forEach(row=>{
       const techKey=row.ffm||row.nombre;
-      if(!techKey){_dbg_noKey++;return;}
+      if(!techKey)return;
       const fecha=row.fecha?new Date(row.fecha+'T12:00:00'):null;
-      if(!fecha||isNaN(fecha.getTime())){_dbg_badDate++;return;}
+      if(!fecha||isNaN(fecha.getTime()))return;
       const dist=METAS[row.distrito]?row.distrito:(normDist(row.distrito)||Object.keys(METAS)[0]);
       const skill=normSkill(row.skill||'');
       if(!techMap[techKey])techMap[techKey]={ffm:row.ffm||techKey,nombre:row.nombre||techKey,dist,skill,coord:'',orders:[]};
@@ -1033,22 +1032,12 @@ async function loadFromSupabase(){
       if(row.coord&&!techMap[techKey].coord)techMap[techKey].coord=row.coord;
       const wk=row.semana||weekKey(fecha);
       const dia=row.dia||fecha.toISOString().slice(0,10);
-      // Dedup por OT
       const otKey=row.ot_num||row.os_num;
-      if(otKey){
-        if(seenOTs_sb.has(otKey)){
-          _dbg_dupOT++;
-          if(_dbg_dupOT<=5)console.log(`[SB-LOAD-DUP #${_dbg_dupOT}] key="${otKey}" ot_num=${JSON.stringify(row.ot_num)} os_num=${JSON.stringify(row.os_num)} semana=${row.semana} ffm=${row.ffm}`);
-          return;
-        }
-        seenOTs_sb.add(otKey);
-      }
+      if(otKey){if(seenOTs_sb.has(otKey))return;seenOTs_sb.add(otKey);}
       techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:row.os_num||'',ot:row.ot_num||'',wk,dia});
       if(!minDate||fecha<minDate)minDate=fecha;
       if(!maxDate||fecha>maxDate)maxDate=fecha;
     });
-    const _dbg_totalOrds=Object.values(techMap).reduce((s,t)=>s+t.orders.length,0);
-    console.log(`[SB-LOAD] Filas de Supabase: ${all.length} | Sin clave: ${_dbg_noKey} | Fecha inválida: ${_dbg_badDate} | OT duplicada: ${_dbg_dupOT} | Órdenes finales: ${_dbg_totalOrds} | Técnicos: ${Object.keys(techMap).length}`);
 
     const allWeeks=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))].sort();
     window._techMap=techMap; window._realWeeks=allWeeks;
@@ -1256,28 +1245,20 @@ async function uploadToSupabase(techMap,filename){
 
   setSbStatus('Subiendo datos…',null);
   try{
-    // Borrar solo las semanas del nuevo Excel (conserva semanas anteriores)
-    const weeksInFile=[...new Set(Object.values(techMap).flatMap(t=>t.orders.map(o=>o.wk)))];
-    if(weeksInFile.length){
-      setSbStatus('Borrando semanas anteriores…',null);
-      const{error:delErr}=await _sb.from('orders').delete().in('semana',weeksInFile).not('id','is',null);
-      if(delErr)throw delErr;
-    }
+    // Borrar TODOS los datos existentes antes de insertar los nuevos
+    // (evita duplicados por cambios de formato de semana entre uploads)
+    setSbStatus('Limpiando base de datos…',null);
+    const{error:delErr}=await _sb.from('orders').delete().not('id','is',null);
+    if(delErr)throw delErr;
 
-    // Construir filas (dedup por OT — protección extra)
+    // Construir filas (el techMap ya viene deduplicado por seenOTs en processWorkbook)
     const rows=[];
-    const seenUpload=new Set();
-    let _dbg_upDup=0;
-    const _dbg_inOrds=Object.values(techMap).reduce((s,t)=>s+t.orders.length,0);
     Object.values(techMap).forEach(tech=>{
       tech.orders.forEach(o=>{
-        const otKey=o.ot||o.os;
-        if(otKey){if(seenUpload.has(otKey)){_dbg_upDup++;return;}seenUpload.add(otKey);}
         rows.push({ffm:tech.ffm,nombre:tech.nombre,distrito:tech.dist,skill:tech.skill,
           coord:tech.coord,fecha:o.dia,tipo:o.tipo,os_num:o.os,ot_num:o.ot,semana:o.wk,dia:o.dia});
       });
     });
-    console.log(`[SB-UPLOAD] Órdenes en techMap: ${_dbg_inOrds} | Eliminadas por dedup: ${_dbg_upDup} | Filas a subir: ${rows.length}`);
 
     // Insertar en batches de 500
     const BATCH=500;
