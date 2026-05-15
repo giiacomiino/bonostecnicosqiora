@@ -989,7 +989,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     <div class="view" id="view-ai" style="display:none;flex-direction:column;height:calc(100vh - 110px)">
 
       <!-- Hero banner -->
-      <div style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);border-radius:16px;padding:24px 28px;margin-bottom:18px;position:relative;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#fff5f0 0%,#fff0eb 50%,#ffe4d6 100%);border-radius:16px;padding:24px 28px;margin-bottom:18px;position:relative;overflow:hidden;border:1.5px solid #fcd5c0">
         <div style="position:absolute;top:-30px;right:-30px;width:180px;height:180px;border-radius:50%;background:rgba(232,84,32,.15)"></div>
         <div style="position:absolute;bottom:-50px;right:80px;width:120px;height:120px;border-radius:50%;background:rgba(232,84,32,.08)"></div>
         <div style="display:flex;align-items:center;gap:16px;position:relative">
@@ -997,12 +997,12 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
           </div>
           <div style="flex:1">
-            <div style="font-size:22px;font-weight:800;color:white;letter-spacing:-.3px">QiORA AI</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:2px">Análisis operativo inteligente · Powered by Gemini</div>
+            <div style="font-size:22px;font-weight:800;color:#1a1a2e;letter-spacing:-.3px">QiORA AI</div>
+            <div style="font-size:12px;color:#9ca3af;margin-top:2px">Análisis operativo inteligente · Powered by Gemini</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
-            <span id="ai-status-badge" style="display:none;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;background:rgba(52,211,153,.15);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)">● Listo</span>
-            <button onclick="toggleAISettings()" id="ai-settings-btn" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.8);border-radius:8px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;backdrop-filter:blur(4px)">
+            <span id="ai-status-badge" style="display:none;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.25)">● Listo</span>
+            <button onclick="toggleAISettings()" id="ai-settings-btn" style="background:white;border:1.5px solid #e5e7eb;color:var(--text2);border-radius:8px;padding:7px 14px;font-family:'Inter',sans-serif;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41"/></svg>
               Configurar
             </button>
@@ -1021,8 +1021,8 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
               oninput="aiKeyChanged()">
           </div>
           <select id="ai-model-sel" style="border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 10px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);background:white;cursor:pointer;outline:none;min-width:160px">
-            <option value="gemini-2.5-flash-preview-05-20" selected>Gemini 2.5 Flash</option>
-            <option value="gemini-2.5-pro-preview-05-06">Gemini 2.5 Pro</option>
+            <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
             <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
             <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
@@ -4340,7 +4340,7 @@ async function sendAI(){
   addBubble('thinking');
 
   const dataCtx=buildAIContext();
-  const model=document.getElementById('ai-model-sel').value||'gemini-2.5-flash-preview-05-20';
+  const model=document.getElementById('ai-model-sel').value||'gemini-2.5-flash';
 
   try{
     const ctrl=new AbortController();
