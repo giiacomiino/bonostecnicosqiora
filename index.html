@@ -1018,7 +1018,6 @@ async function loadFromSupabase(){
     }
 
     const techMap={};
-    const seenOTs_sb=new Set(); // safety net: descarta duplicados de OT si quedaran en Supabase
     let minDate=null,maxDate=null;
     all.forEach(row=>{
       const techKey=row.ffm||row.nombre;
@@ -1032,8 +1031,6 @@ async function loadFromSupabase(){
       if(row.coord&&!techMap[techKey].coord)techMap[techKey].coord=row.coord;
       const wk=row.semana||weekKey(fecha);
       const dia=row.dia||fecha.toISOString().slice(0,10);
-      const otKey=row.ot_num||row.os_num;
-      if(otKey){if(seenOTs_sb.has(otKey))return;seenOTs_sb.add(otKey);}
       techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:row.os_num||'',ot:row.ot_num||'',wk,dia});
       if(!minDate||fecha<minDate)minDate=fecha;
       if(!maxDate||fecha>maxDate)maxDate=fecha;
@@ -3218,7 +3215,6 @@ async function processWorkbook(wb,filename){
 
   // ── PASO 1: leer todas las órdenes → techMap ─────────────────────────────
   const techMap={};
-  const seenOTs=new Set(); // dedup global: una OT no puede contarse dos veces
   let minDate=null, maxDate=null;
 
   dataRows.forEach(row=>{
@@ -3236,24 +3232,17 @@ async function processWorkbook(wb,filename){
     const skill=normSkill(clean(row[C.skill]||''));
     const osNum =clean(row[C.os]||'');
     const otNum =clean(row[C.ot]||'');
-    // 'Tipo' es el tipo de servicio que se usa para calcular puntos con svcPoints
     const tipo  =clean(row[C.tipo]||row[C.servicio]||'Soporte');
     const wk    =weekKey(fecha);
     const dia   =fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0')+'-'+String(fecha.getDate()).padStart(2,'0');
 
     const coordRaw=clean(C.coord>=0?row[C.coord]||'':'');
-    // Mostrar coordinador: si viene en formato CTA-TPI-INT-*, quitar prefijo
     const coordNom=coordRaw.startsWith('CTA-TPI-INT-')?coordRaw.replace('CTA-TPI-INT-',''):coordRaw;
 
     if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[]};
     if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
     if(coordNom&&!techMap[techKey].coord)techMap[techKey].coord=coordNom;
 
-    // Dedup por OT: si ya se procesó esta OT, se ignora (Field Cloud puede enviar duplicados)
-    const otKey=otNum||osNum;
-    if(otKey){if(seenOTs.has(otKey))return;seenOTs.add(otKey);}
-
-    // Guardamos tipo (no puntos) → los puntos se calculan en rebuildFromRawOrders con SERVICIOS actuales
     techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
 
     if(!minDate||fecha<minDate)minDate=fecha;
