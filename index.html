@@ -997,7 +997,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
           </div>
           <div style="flex:1">
             <div style="font-size:22px;font-weight:800;color:#1a1a2e;letter-spacing:-.3px">QiORA AI</div>
-            <div style="font-size:12px;color:#9ca3af;margin-top:2px">Análisis operativo inteligente · Powered by Gemini</div>
+            <div class="ai-subtitle" style="font-size:12px;color:#9ca3af;margin-top:2px">Análisis operativo inteligente · Powered by Gemini</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <span id="ai-status-badge" style="display:none;font-size:11px;font-weight:600;padding:5px 12px;border-radius:20px;background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.25)">● Listo</span>
@@ -1683,11 +1683,13 @@ const TITLES={
   config:['Configuración','Reglas y esquemas'],
   ai:['QiORA AI','Análisis operativo inteligente'],
 };
+let _currentView='nacional';
 function nav(id,el){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-i').forEach(n=>n.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
   el.classList.add('active');
+  _currentView=id;
   const [t,b]=TITLES[id];
   document.getElementById('tb-title').textContent=t;
   document.getElementById('tb-badge').textContent=b;
@@ -1696,6 +1698,7 @@ function nav(id,el){
   if(id==='tecnicos')renderTecList();
   if(id==='calculo')renderCalculo();
   if(id==='config')renderConfig();
+  updateAIViewContext();
 }
 
 // ═══════════════════════════════════════════
@@ -2103,6 +2106,7 @@ function openDist(d){
   selDistrito=d;
   document.getElementById('dist-list-view').style.display='none';
   document.getElementById('dist-detail-view').style.display='';
+  updateAIViewContext();
   renderDistDetail(d);
 }
 
@@ -2432,6 +2436,7 @@ function showCoordList(){document.getElementById('coord-list-view').style.displa
 
 function openCoord(cid){
   selCoord=cid;
+  updateAIViewContext();
   const coord=coordData.find(c=>c.id===cid);
   if(!coord)return;
   document.getElementById('coord-list-view').style.display='none';
@@ -2708,6 +2713,7 @@ function openTecFicha(tid){
   const t=allData.find(x=>x.id===tid);
   if(!t)return;
   selTecnico=tid;
+  updateAIViewContext();
   document.getElementById('tec-list-view').style.display='none';
   document.getElementById('tec-ficha-view').style.display='';
   renderFicha(t);
@@ -4152,6 +4158,7 @@ function initAI(){
     const sel=document.getElementById('ai-model-sel');
     if([...sel.options].some(o=>o.value===savedModel))sel.value=savedModel;
   }
+  updateAIViewContext();
 }
 
 function toggleAISettings(){
@@ -4197,64 +4204,175 @@ function aiChip(el){
   sendAI();
 }
 
-// ── Agregador de datos para el contexto (versión compacta) ──────────────────
-function buildAIContext(){
-  if(!window._allRealData||!window._allRealData.length)return'Sin datos cargados.';
-
+// ── Builders de contexto por vista ──────────────────────────────────────────
+function _ctxNacional(){
   const data=window._allRealData;
   const weeks=[...new Set(data.map(d=>d.wk))].sort();
-  const last4=weeks.slice(-4);
-
-  // Resumen nacional — solo últimas 4 semanas
+  const last8=weeks.slice(-8);
   const wkNac={};
-  data.filter(d=>last4.includes(d.wk)).forEach(d=>{
-    if(!wkNac[d.wk])wkNac[d.wk]={wk:d.wk,bonos:0,techs:0,sumPct:0,tier100:0,tier90:0,tier80:0,tierBajo:0};
+  data.filter(d=>last8.includes(d.wk)).forEach(d=>{
+    if(!wkNac[d.wk])wkNac[d.wk]={wk:d.wk,bonos:0,techs:0,sumPct:0,tier100:0,tier90:0,tier80:0,tierBajo:0,inas:0};
     const w=wkNac[d.wk];
     w.techs++;w.bonos+=d.bonoFinal||0;w.sumPct+=(d.pct||0);
     if(d.pct>=100)w.tier100++;else if(d.pct>=90)w.tier90++;else if(d.pct>=80)w.tier80++;else w.tierBajo++;
+    if((d.inas||0)>0)w.inas++;
   });
-
-  // Ranking distritos — últimas 4 semanas
   const distRank={};
-  data.filter(d=>last4.includes(d.wk)).forEach(d=>{
-    if(!distRank[d.distrito])distRank[d.distrito]={dist:d.distrito,tipo:d.tipoDistrito||'B',bonos:0,techs:0,sumPct:0};
-    const r=distRank[d.distrito];
-    r.techs++;r.bonos+=d.bonoFinal||0;r.sumPct+=(d.pct||0);
+  data.filter(d=>last8.includes(d.wk)).forEach(d=>{
+    if(!distRank[d.distrito])distRank[d.distrito]={dist:d.distrito.replace('CTA-TPI-INT-',''),tipo:d.tipoDistrito||'B',bonos:0,techs:0,sumPct:0};
+    const r=distRank[d.distrito];r.techs++;r.bonos+=d.bonoFinal||0;r.sumPct+=(d.pct||0);
   });
-  const distArr=Object.values(distRank).map(r=>({
-    dist:r.dist.replace('CTA-TPI-INT-',''),tipo:r.tipo,
-    avgPct:r.techs?+(r.sumPct/r.techs).toFixed(1):0,
-    avgBono:r.techs?Math.round(r.bonos/r.techs):0
-  })).sort((a,b)=>b.avgPct-a.avgPct);
+  const distArr=Object.values(distRank).map(r=>({...r,avgPct:r.techs?+(r.sumPct/r.techs).toFixed(1):0,avgBono:r.techs?Math.round(r.bonos/r.techs):0})).sort((a,b)=>b.avgPct-a.avgPct);
+  let ctx=`VISTA: Nacional | Período: ${weeks[0]} a ${weeks[weeks.length-1]} (${weeks.length} semanas)\n\n`;
+  ctx+='TENDENCIA NACIONAL (últimas 8 semanas):\n';
+  ctx+='semana|techs|bonos_total|avg%meta|100%+|90-99%|80-89%|<80%|con_inas\n';
+  Object.values(wkNac).sort((a,b)=>a.wk.localeCompare(b.wk)).forEach(w=>{
+    ctx+=`${w.wk}|${w.techs}|$${w.bonos.toLocaleString('es-MX')}|${w.techs?(w.sumPct/w.techs).toFixed(1):0}%|${w.tier100}|${w.tier90}|${w.tier80}|${w.tierBajo}|${w.inas}\n`;
+  });
+  ctx+='\nRANKING DISTRITOS (últ. 8 sem):\n';
+  ctx+='distrito|tipo|avg%meta|avg_bono/tech\n';
+  distArr.forEach(r=>ctx+=`${r.dist}|${r.tipo}|${r.avgPct}%|$${r.avgBono.toLocaleString('es-MX')}\n`);
+  return ctx;
+}
 
-  // Técnicos $0 recurrente — top 8
-  const techZero={};
-  data.forEach(d=>{
-    if((d.bonoFinal||0)===0){
-      if(!techZero[d.nombre])techZero[d.nombre]={n:d.nombre,d:d.distrito.replace('CTA-TPI-INT-',''),s:0};
-      techZero[d.nombre].s++;
+function _ctxDistrito(){
+  const data=window._allRealData;
+  const dist=selDistrito;
+  const distData=dist?data.filter(d=>d.distrito===dist):data;
+  const weeks=[...new Set(data.map(d=>d.wk))].sort();
+  const last10=weeks.slice(-10);
+  const wkDist={};
+  distData.filter(d=>last10.includes(d.wk)).forEach(d=>{
+    if(!wkDist[d.wk])wkDist[d.wk]={wk:d.wk,bonos:0,techs:0,sumPct:0,tier100:0,tierBajo:0,inas:0};
+    const w=wkDist[d.wk];
+    w.techs++;w.bonos+=d.bonoFinal||0;w.sumPct+=(d.pct||0);
+    if(d.pct>=100)w.tier100++;else w.tierBajo++;
+    if((d.inas||0)>0)w.inas++;
+  });
+  // Coordinadores en ese distrito
+  const coordAgg={};
+  distData.filter(d=>last10.includes(d.wk)).forEach(d=>{
+    const c=d.coord||'Sin coord';
+    if(!coordAgg[c])coordAgg[c]={coord:c,bonos:0,techs:new Set(),sumPct:0,cnt:0};
+    coordAgg[c].bonos+=d.bonoFinal||0;coordAgg[c].techs.add(d.nombre);coordAgg[c].sumPct+=(d.pct||0);coordAgg[c].cnt++;
+  });
+  const coords=Object.values(coordAgg).map(c=>({...c,nTechs:c.techs.size,avgPct:c.cnt?+(c.sumPct/c.cnt).toFixed(1):0,avgBono:c.cnt?Math.round(c.bonos/c.cnt):0})).sort((a,b)=>b.avgPct-a.avgPct);
+  const distNombre=dist?dist.replace('CTA-TPI-INT-',''):'todos los distritos';
+  let ctx=`VISTA: Distrito — ${distNombre}\n\n`;
+  ctx+='TENDENCIA (últimas 10 semanas):\n';
+  ctx+='semana|techs|bonos|avg%|al100%|<80%|inas\n';
+  Object.values(wkDist).sort((a,b)=>a.wk.localeCompare(b.wk)).forEach(w=>{
+    ctx+=`${w.wk}|${w.techs}|$${w.bonos.toLocaleString('es-MX')}|${w.techs?(w.sumPct/w.techs).toFixed(1):0}%|${w.tier100}|${w.tierBajo}|${w.inas}\n`;
+  });
+  ctx+='\nCOORDINADORES (últ. 10 sem):\n';
+  ctx+='coordinador|techs|avg%meta|avg_bono/tech\n';
+  coords.forEach(c=>ctx+=`${c.coord}|${c.nTechs}|${c.avgPct}%|$${c.avgBono.toLocaleString('es-MX')}\n`);
+  return ctx;
+}
+
+function _ctxCoordinador(){
+  const data=window._allRealData;
+  const coord=selCoord?coordData?.find(c=>c.id===selCoord):null;
+  const coordNombre=coord?.nombre||coord?.id||selCoord||null;
+  const weeks=[...new Set(data.map(d=>d.wk))].sort();
+  const last6=weeks.slice(-6);
+  const coordData2=coordNombre?data.filter(d=>d.coord===coordNombre):data;
+  // Por técnico
+  const techAgg={};
+  coordData2.filter(d=>last6.includes(d.wk)).forEach(d=>{
+    if(!techAgg[d.nombre])techAgg[d.nombre]={nombre:d.nombre,dist:d.distrito.replace('CTA-TPI-INT-',''),semanas:[],bonos:0,sumPct:0,cnt:0,inas:0};
+    const t=techAgg[d.nombre];
+    t.semanas.push(d.wk);t.bonos+=d.bonoFinal||0;t.sumPct+=(d.pct||0);t.cnt++;
+    if((d.inas||0)>0)t.inas++;
+  });
+  const techs=Object.values(techAgg).map(t=>({...t,avgPct:t.cnt?+(t.sumPct/t.cnt).toFixed(1):0,avgBono:t.cnt?Math.round(t.bonos/t.cnt):0})).sort((a,b)=>b.avgPct-a.avgPct);
+  let ctx=`VISTA: Coordinador — ${coordNombre||'todos'}\n\n`;
+  ctx+='TÉCNICOS A CARGO (últimas 6 semanas):\n';
+  ctx+='técnico|distrito|sem_activas|avg%meta|avg_bono|inas\n';
+  techs.forEach(t=>ctx+=`${t.nombre}|${t.dist}|${t.cnt}|${t.avgPct}%|$${t.avgBono.toLocaleString('es-MX')}|${t.inas}\n`);
+  return ctx;
+}
+
+function _ctxTecnico(){
+  const data=window._allRealData;
+  const tec=selTecnico?data.find(d=>d.id===selTecnico):null;
+  if(!tec)return _ctxNacional();
+  const nombre=tec.nombre;
+  const tecRows=data.filter(d=>d.nombre===nombre).sort((a,b)=>a.wk.localeCompare(b.wk));
+  let ctx=`VISTA: Técnico — ${nombre}\n`;
+  ctx+=`Distrito: ${tec.distrito.replace('CTA-TPI-INT-','')}, Cuadrilla: ${tec.skill||'-'}, Coordinador: ${tec.coord||'-'}\n\n`;
+  ctx+='HISTORIAL SEMANAL:\n';
+  ctx+='semana|estrellas|meta|%meta|bono_base|bono_extra|bono_final|dias_trab|inas\n';
+  tecRows.forEach(r=>{
+    ctx+=`${r.wk}|${r.estrellas||0}|${r.meta||0}|${r.pct?.toFixed(1)||0}%|$${r.bonoBase||0}|$${r.bonoExtra||0}|$${r.bonoFinal||0}|${r.diasTrab||0}|${r.inas||0}\n`;
+  });
+  // Órdenes individuales si hay datos crudos
+  if(window._techMap){
+    const rawTech=Object.values(window._techMap).find(t=>t.nombre===nombre);
+    if(rawTech?.orders?.length){
+      const recentOrders=rawTech.orders.slice(-50);
+      ctx+='\nÓRDENES RECIENTES (últimas 50):\n';
+      ctx+='fecha|tipo|os|semana\n';
+      recentOrders.forEach(o=>ctx+=`${o.dia||o.fecha}|${o.tipo}|${o.os||o.os_num||'-'}|${o.wk}\n`);
+    }
+  }
+  return ctx;
+}
+
+function buildAIContext(){
+  if(!window._allRealData||!window._allRealData.length)return'Sin datos cargados.';
+  const view=_currentView;
+  if(view==='distritos')return _ctxDistrito();
+  if(view==='coordinadores')return _ctxCoordinador();
+  if(view==='tecnicos')return _ctxTecnico();
+  return _ctxNacional();
+}
+
+// Sugerencias por vista
+const AI_SUGGESTIONS={
+  nacional:[
+    'Análisis operativo inteligente · Vista Nacional',
+    ['¿Qué distrito tuvo peor desempeño constante?','¿Qué semana fue la más productiva?'],
+    ['¿Por qué bajó el % meta nacional esta semana?','¿Qué distritos están mejorando tendencia?']
+  ],
+  distritos:[
+    'Análisis operativo inteligente · Vista Distrito',
+    ['¿Cuál coordinador tiene mejor rendimiento?','¿Cómo evolucionó este distrito en 10 semanas?'],
+    ['¿Qué semana fue crítica en este distrito?','¿Por qué hay técnicos sin bono recurrente?']
+  ],
+  coordinadores:[
+    'Análisis operativo inteligente · Vista Coordinador',
+    ['¿Quién es el técnico más consistente de este coord?','¿Cuántos técnicos no alcanzaron meta este mes?'],
+    ['¿Qué patrón de inasistencias tiene el equipo?','¿Quién mejoró más en las últimas semanas?']
+  ],
+  tecnicos:[
+    'Análisis operativo inteligente · Vista Técnico',
+    ['¿Cuántas órdenes hizo este técnico la última semana?','¿Cuál fue su mejor semana histórica?'],
+    ['¿Qué tipo de OS hace más frecuentemente?','¿Cuándo tuvo inasistencias y cómo afectó su bono?']
+  ],
+  ai:['Análisis operativo inteligente · Powered by Gemini',
+    ['¿Qué distrito tuvo peor desempeño constante en las últimas 8 semanas?','¿Por qué aumentaron los bonos entre la última semana de 2025 y la primera de 2026?'],
+    ['¿Cuántos técnicos no alcanzaron meta en las últimas 4 semanas?','¿Qué tendencia muestran los distritos Tipo A vs Tipo B?']
+  ]
+};
+
+function updateAIViewContext(){
+  const view=_currentView||'nacional';
+  const sug=AI_SUGGESTIONS[view]||AI_SUGGESTIONS.nacional;
+  const subtitle=sug[0];
+  const chips1=sug[1];
+  const chips2=sug[2];
+  const subEl=document.querySelector('#view-ai .ai-subtitle');
+  if(subEl)subEl.textContent=subtitle;
+  // Actualizar chips de sugerencias
+  const chipEls=document.querySelectorAll('#ai-suggestions .ai-sug-card');
+  const allChips=[...chips1,...chips2];
+  chipEls.forEach((el,i)=>{
+    if(i<allChips.length){
+      const textEl=el.querySelector('div:last-child');
+      if(textEl)textEl.textContent=allChips[i];
     }
   });
-  const zeros=Object.values(techZero).filter(t=>t.s>=2).sort((a,b)=>b.s-a.s).slice(0,8);
-
-  let ctx=`PERÍODO: semanas ${weeks[0]} a ${weeks[weeks.length-1]} (${weeks.length} semanas). Últimas 4: ${last4.join(', ')}\n\n`;
-
-  ctx+='RESUMEN NACIONAL (últimas 4 semanas):\n';
-  ctx+='semana|techs|bonos|avg%|100%+|90-99%|80-89%|<80%\n';
-  Object.values(wkNac).sort((a,b)=>a.wk.localeCompare(b.wk)).forEach(w=>{
-    ctx+=`${w.wk}|${w.techs}|$${w.bonos.toLocaleString('es-MX')}|${w.techs?(w.sumPct/w.techs).toFixed(1):0}%|${w.tier100}|${w.tier90}|${w.tier80}|${w.tierBajo}\n`;
-  });
-
-  ctx+='\nRANKING DISTRITOS (últ. 4 sem, por % meta):\n';
-  ctx+='distrito|tipo|avg%|avg_bono\n';
-  distArr.forEach(r=>ctx+=`${r.dist}|${r.tipo}|${r.avgPct}%|$${r.avgBono.toLocaleString('es-MX')}\n`);
-
-  if(zeros.length){
-    ctx+='\nTÉCNICOS SIN BONO RECURRENTE (≥2 sem):\n';
-    zeros.forEach(t=>ctx+=`${t.n}|${t.d}|${t.s} semanas\n`);
-  }
-
-  return ctx;
 }
 
 // ── Render de burbujas de chat ───────────────────────────────────────────────
