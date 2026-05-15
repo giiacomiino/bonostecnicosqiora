@@ -410,6 +410,21 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 
   <div class="content">
 
+    <!-- ══ BANNER: SIN DATOS ══ -->
+    <div id="no-data-banner" style="display:none;position:sticky;top:0;z-index:100;background:linear-gradient(135deg,#fff5f0,#ffe4d6);border:1.5px solid #fcd5c0;border-radius:14px;padding:20px 24px;margin-bottom:20px;display:none;align-items:center;gap:18px">
+      <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#E85420,#ff7c4d);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:800;color:#1a1a2e">Sin datos cargados</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">Carga datos desde Supabase o sube un archivo Excel para ver las vistas</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button onclick="loadFromSupabase()" style="background:linear-gradient(135deg,#E85420,#ff7c4d);color:white;border:none;border-radius:8px;padding:9px 16px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer">Traer de Supabase</button>
+        <button onclick="document.getElementById('file-input').click()" style="background:white;color:#E85420;border:1.5px solid #fcd5c0;border-radius:8px;padding:9px 16px;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer">Subir Excel</button>
+      </div>
+    </div>
+
     <!-- ══════ VIEW: NACIONAL ══════ -->
     <div class="view active" id="view-nacional">
 
@@ -3288,6 +3303,9 @@ function saveConfig(){
 
 // Renderiza la vista activa + nacional (se llama tras cambiar semana o config)
 function renderAll(){
+  // Mostrar/ocultar banner de sin datos
+  const banner=document.getElementById('no-data-banner');
+  if(banner)banner.style.display=(allData&&allData.length>0)?'none':'flex';
   renderNacional();
   const dv=id=>document.getElementById(id);
   if(dv('view-distritos').classList.contains('active')){
@@ -4187,6 +4205,9 @@ function doExport(){
 // ═══════════════════════════════════════════
 allData=[];
 coordData=[];
+// Mostrar banner de sin datos al inicio
+const _initBanner=document.getElementById('no-data-banner');
+if(_initBanner)_initBanner.style.display='flex';
 renderNacional();
 renderConfig();
 // Iniciar carga de config antes que los datos — garantiza METAS idénticos en ambas rutas
@@ -4531,34 +4552,50 @@ function toggleQAI(view){
   body.style.display=open?'':'none';
   if(chev)chev.textContent=open?'▴':'▾';
 }
+function _qaiMsg(chat,type,text){
+  const d=document.createElement('div');
+  if(type==='user'){d.className='qai-msg-user';d.textContent=text;}
+  else if(type==='error'){d.className='qai-msg-ai';d.style.cssText='border-color:#fca5a5;color:#ef4444;font-size:12px';d.textContent=text;}
+  else if(type==='info'){d.className='qai-msg-ai';d.style.cssText='border-color:#bfdbfe;color:#1d4ed8;font-size:12px';d.textContent=text;}
+  else{d.className='qai-msg-ai';d.innerHTML=fmtAIText(text);}
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;return d;
+}
 async function miniSendAI(view){
   if(_miniSending[view])return;
+  const chat=document.getElementById('qai-chat-'+view);
+  const input=document.getElementById('qai-inp-'+view);
+  const btn=document.getElementById('qai-btn-'+view);
+  if(!chat||!input||!btn)return;
+
+  // Verificar API key
   let key=(localStorage.getItem('qiora_gemini_key')||'').trim();
   if(!key){
     const ki=document.getElementById('ai-key-input');
     const kv=ki?ki.value.trim():'';
     if(kv){key=kv;localStorage.setItem('qiora_gemini_key',kv);updateAIBadge(true);}
-    else{alert('Configura tu Gemini API key en la sección QiORA AI → Configurar.');return;}
+    else{
+      _qaiMsg(chat,'info','Configura tu Gemini API key primero: ve a la sección QiORA AI en el menú lateral → botón Configurar → pega tu key y guarda.');
+      return;
+    }
   }
-  const input=document.getElementById('qai-inp-'+view);
-  const question=(input?.value||'').trim();
+  const question=input.value.trim();
   if(!question)return;
+
   _miniSending[view]=true;
-  const btn=document.getElementById('qai-btn-'+view);
-  const chat=document.getElementById('qai-chat-'+view);
   const origHTML=btn.innerHTML;
-  btn.disabled=true;
-  btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Analizando…';
+  btn.disabled=true;btn.innerHTML='⏳ Analizando…';
   input.value='';
-  const uDiv=document.createElement('div');uDiv.className='qai-msg-user';uDiv.textContent=question;chat.appendChild(uDiv);
+
+  _qaiMsg(chat,'user',question);
   const tDiv=document.createElement('div');tDiv.className='qai-thinking';tDiv.id='qai-think-'+view;
   tDiv.innerHTML='<div class="ai-dots"><span></span><span></span><span></span></div> QiORA AI está analizando…';
   chat.appendChild(tDiv);chat.scrollTop=chat.scrollHeight;
-  const savedView=_currentView;_currentView=view;
-  const dataCtx=buildAIContext();_currentView=savedView;
-  const model=localStorage.getItem('qiora_gemini_model')||'gemini-2.5-flash';
-  const fullText=`${AI_SYSTEM_PROMPT}\n\n---\n${dataCtx}\n\nPREGUNTA DEL USUARIO: ${question}`;
+
   try{
+    const savedView=_currentView;_currentView=view;
+    const dataCtx=buildAIContext();_currentView=savedView;
+    const model=localStorage.getItem('qiora_gemini_model')||'gemini-2.5-flash';
+    const fullText=`${AI_SYSTEM_PROMPT}\n\n---\n${dataCtx}\n\nPREGUNTA DEL USUARIO: ${question}`;
     const resp=await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
       {method:'POST',headers:{'Content-Type':'application/json'},
@@ -4566,12 +4603,12 @@ async function miniSendAI(view){
     );
     const json=await resp.json();
     if(!resp.ok)throw new Error(json.error?.message||`HTTP ${resp.status}`);
-    const answer=json.candidates?.[0]?.content?.parts?.[0]?.text||'Sin respuesta.';
+    const answer=json.candidates?.[0]?.content?.parts?.[0]?.text||'Sin respuesta del modelo.';
     document.getElementById('qai-think-'+view)?.remove();
-    const aDiv=document.createElement('div');aDiv.className='qai-msg-ai';aDiv.innerHTML=fmtAIText(answer);chat.appendChild(aDiv);
+    _qaiMsg(chat,'ai',answer);
   }catch(err){
     document.getElementById('qai-think-'+view)?.remove();
-    const eDiv=document.createElement('div');eDiv.className='qai-msg-ai';eDiv.style.cssText='border-color:#fca5a5;color:#ef4444';eDiv.textContent='Error: '+err.message;chat.appendChild(eDiv);
+    _qaiMsg(chat,'error','Error: '+err.message);
   }finally{
     _miniSending[view]=false;btn.disabled=false;btn.innerHTML=origHTML;chat.scrollTop=chat.scrollHeight;
   }
