@@ -282,6 +282,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 <!-- ═══════════ SIDEBAR ═══════════ -->
 <nav class="sidebar">
   <div class="s-logo">
+    <div class="s-logo-icon">
       <img id="sidebar-logo-img" style="width:22px;height:22px;filter:invert(1)" alt="QiORA"/>
     </div>
     <div>
@@ -4446,7 +4447,7 @@ async function sendAI(){
       {method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,
        body:JSON.stringify({
          contents:[{parts:[{text:fullText}]}],
-         generationConfig:{temperature:0.3,maxOutputTokens:1500}
+         generationConfig:{temperature:0.3,maxOutputTokens:4000}
        })}
     );
     clearTimeout(timer);
