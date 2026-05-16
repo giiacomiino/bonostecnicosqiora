@@ -2160,27 +2160,29 @@ function renderDistList(){
     const bCob=b[1].n>0?b[1].cb/b[1].n*100:0;
     return bCob-aCob;
   });
-  if(chartDistOverview)chartDistOverview.destroy();
-  chartDistOverview=new Chart(document.getElementById('chart-dist-overview'),{
-    type:'bar',
-    data:{
-      labels:allStats.map(([d])=>distShort(d)),
-      datasets:[{
-        label:'Cobertura de Bono %',
-        data:allStats.map(([,s])=>s.n>0?parseFloat((s.cb/s.n*100).toFixed(1)):0),
-        backgroundColor:allStats.map(([,s])=>{const p=s.n>0?s.cb/s.n*100:0;return p>=80?'rgba(22,163,74,.75)':p>=50?'rgba(232,84,32,.75)':'rgba(220,38,38,.6)';}),
-        borderRadius:4,borderSkipped:false
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y.toFixed(1)}% cobertura de bono`}}},
-      scales:{
-        x:{grid:{display:false},ticks:{font:{size:9},maxRotation:40}},
-        y:{grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:100}
+  try{
+    if(chartDistOverview){chartDistOverview.destroy();chartDistOverview=null;}
+    chartDistOverview=new Chart(document.getElementById('chart-dist-overview'),{
+      type:'bar',
+      data:{
+        labels:allStats.map(([d])=>distShort(d)),
+        datasets:[{
+          label:'Cobertura de Bono %',
+          data:allStats.map(([,s])=>s.n>0?parseFloat((s.cb/s.n*100).toFixed(1)):0),
+          backgroundColor:allStats.map(([,s])=>{const p=s.n>0?s.cb/s.n*100:0;return p>=80?'rgba(22,163,74,.75)':p>=50?'rgba(232,84,32,.75)':'rgba(220,38,38,.6)';}),
+          borderRadius:4,borderSkipped:false
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y.toFixed(1)}% cobertura de bono`}}},
+        scales:{
+          x:{grid:{display:false},ticks:{font:{size:9},maxRotation:40}},
+          y:{grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:100}
+        }
       }
-    }
-  });
+    });
+  }catch(e){console.warn('dist-overview chart:',e);}
 
   document.getElementById('dist-cards').innerHTML=filtered.map(([d,s])=>{
     const avgPct=(s.sumPct/s.n).toFixed(1);
@@ -4597,6 +4599,9 @@ async function miniSendAI(view){
 let _aiSending=false;
 async function sendAI(){
   if(_aiSending)return;
+  // Immediate visual feedback on click
+  const _sendBtn=document.getElementById('ai-send-btn');
+  if(_sendBtn){_sendBtn.style.transform='scale(0.88)';setTimeout(()=>{if(_sendBtn)_sendBtn.style.transform=''},120);}
   let key=(localStorage.getItem('qiora_gemini_key')||'').trim();
   if(!key){
     // Si el usuario escribió la key en el campo pero no la guardó, úsala automáticamente
@@ -4605,12 +4610,17 @@ async function sendAI(){
     else{
       document.getElementById('ai-key-panel').style.display='block';
       document.getElementById('ai-key-input').focus();
+      document.getElementById('ai-key-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+      addBubble('ai','Necesitas tu **Gemini API key** para usar QiORA AI.\n\nHaz clic en **Configurar** (arriba a la derecha del banner) → pega tu key → **Guardar**.\n\nLa key nunca sale de tu navegador.');
       return;
     }
   }
   const input=document.getElementById('ai-input');
   const question=input.value.trim();
-  if(!question)return;
+  if(!question){
+    addBubble('ai','Escribe tu pregunta en el campo de texto y luego haz clic en enviar.');
+    return;
+  }
 
   _aiSending=true;
   const btn=document.getElementById('ai-send-btn');
@@ -4651,6 +4661,13 @@ async function sendAI(){
     btn.disabled=false;btn.style.opacity='';
   }
 }
+// Herramienta de debug: resetAI() en consola del navegador
+window.resetAI=function(){
+  _aiSending=false;
+  const b=document.getElementById('ai-send-btn');
+  if(b){b.disabled=false;b.style.opacity='';}
+  console.log('AI reset. key:',localStorage.getItem('qiora_gemini_key')?'SET':'MISSING','allData:',allData.length,'records');
+};
 </script>
 
 <!-- MODAL: Exportar datos -->
