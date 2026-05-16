@@ -2219,7 +2219,15 @@ function openDist(d){
 
 function renderDistDetail(d){
   const info=METAS[d]||{t:'B'};
-  const tecs=getFiltered().filter(t=>t.distrito===d);
+  // Buscar en allData (semana/skill actuales); si vacío, buscar en _allRealData filtrado a semana actual
+  let tecs=getFiltered().filter(t=>t.distrito===d);
+  if(!tecs.length&&window._allRealData){
+    const wk=window._currentRealWk;
+    tecs=(wk
+      ?window._allRealData.filter(t=>t.distrito===d&&t.semana===wk)
+      :window._allRealData.filter(t=>t.distrito===d));
+    if(globalSkill)tecs=tecs.filter(t=>t.skill===globalSkill);
+  }
   const total=tecs.length;
   const activas=tecs.filter(t=>t.nOrdenes>0).length;
   const totalB=tecs.reduce((s,t)=>s+t.bonoFinal,0);
@@ -2298,23 +2306,25 @@ function renderDistDetail(d){
   const tipoEntries=Object.entries(tipoCount).sort((a,b)=>b[1]-a[1]);
   const totalOSFull=tipoEntries.reduce((s,[,n])=>s+n,0)||1;
   document.getElementById('os-total-num').textContent=totalOS.toLocaleString();
-  if(chartOsDist)chartOsDist.destroy();
-  if(tipoEntries.length){
-    chartOsDist=new Chart(document.getElementById('chart-os-dist'),{
-      type:'doughnut',
-      data:{labels:tipoEntries.map(([t])=>t),datasets:[{data:tipoEntries.map(([,n])=>n),backgroundColor:tipoEntries.map((_,i)=>SVC_COLORS[i%SVC_COLORS.length]),borderWidth:2,borderColor:'white'}]},
-      options:{responsive:true,maintainAspectRatio:true,cutout:'65%',plugins:{legend:{display:false}}}
-    });
-    document.getElementById('os-legend').innerHTML=tipoEntries.map(([tipo,cnt],i)=>{
-      const color=SVC_COLORS[i%SVC_COLORS.length];
-      return `<div class="os-leg-i"><div class="os-leg-hdr">
-        <span class="os-leg-name"><span class="os-dot" style="background:${color}"></span>${tipo}</span>
-        <span class="os-count">${(cnt/totalOSFull*100).toFixed(1)}% (${cnt.toLocaleString()})</span>
-      </div><div class="pb"><div class="pf" style="width:${(cnt/totalOSFull*100).toFixed(0)}%;background:${color}"></div></div></div>`;
-    }).join('');
-  }else{
-    document.getElementById('os-legend').innerHTML='<div style="color:var(--text3);font-size:12px">Sin datos de OS</div>';
-  }
+  try{
+    if(chartOsDist){chartOsDist.destroy();chartOsDist=null;}
+    if(tipoEntries.length){
+      chartOsDist=new Chart(document.getElementById('chart-os-dist'),{
+        type:'doughnut',
+        data:{labels:tipoEntries.map(([t])=>t),datasets:[{data:tipoEntries.map(([,n])=>n),backgroundColor:tipoEntries.map((_,i)=>SVC_COLORS[i%SVC_COLORS.length]),borderWidth:2,borderColor:'white'}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'65%',plugins:{legend:{display:false}}}
+      });
+      document.getElementById('os-legend').innerHTML=tipoEntries.map(([tipo,cnt],i)=>{
+        const color=SVC_COLORS[i%SVC_COLORS.length];
+        return `<div class="os-leg-i"><div class="os-leg-hdr">
+          <span class="os-leg-name"><span class="os-dot" style="background:${color}"></span>${tipo}</span>
+          <span class="os-count">${(cnt/totalOSFull*100).toFixed(1)}% (${cnt.toLocaleString()})</span>
+        </div><div class="pb"><div class="pf" style="width:${(cnt/totalOSFull*100).toFixed(0)}%;background:${color}"></div></div></div>`;
+      }).join('');
+    }else{
+      document.getElementById('os-legend').innerHTML='<div style="color:var(--text3);font-size:12px">Sin datos de OS</div>';
+    }
+  }catch(e){console.warn('chart-os-dist:',e);}
 
   const pctF=parseFloat(avgPct);
   document.getElementById('alert-text').textContent=
@@ -2525,22 +2535,24 @@ function renderCoordList(){
     const tBono=allData.filter(t=>t.coordId===c.id).reduce((s,t)=>s+t.bonoFinal,0);
     return{...c,tBono};
   }).sort((a,b)=>b.tBono-a.tBono).slice(0,15);
-  if(chartCoordOverview)chartCoordOverview.destroy();
-  chartCoordOverview=new Chart(document.getElementById('chart-coord-overview'),{
-    type:'bar',
-    data:{
-      labels:top15.map(c=>c.nombre.split(' ').slice(0,2).join(' ')),
-      datasets:[{data:top15.map(c=>c.tBono),backgroundColor:top15.map(c=>c.tBono>0?'rgba(232,84,32,.75)':'#E5E7EB'),borderRadius:4,borderSkipped:false}]
-    },
-    options:{
-      indexAxis:'y',responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${f$(c.parsed.x)} bonos · ${top15[c.dataIndex].tecnicosIds.length} técnicos`}}},
-      scales:{
-        x:{grid:{color:'#F3F4F6'},ticks:{callback:v=>fk(v),font:{size:10}}},
-        y:{grid:{display:false},ticks:{font:{size:10}}}
+  try{
+    if(chartCoordOverview){chartCoordOverview.destroy();chartCoordOverview=null;}
+    chartCoordOverview=new Chart(document.getElementById('chart-coord-overview'),{
+      type:'bar',
+      data:{
+        labels:top15.map(c=>c.nombre.split(' ').slice(0,2).join(' ')),
+        datasets:[{data:top15.map(c=>c.tBono),backgroundColor:top15.map(c=>c.tBono>0?'rgba(232,84,32,.75)':'#E5E7EB'),borderRadius:4,borderSkipped:false}]
+      },
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${f$(c.parsed.x)} bonos · ${top15[c.dataIndex].tecnicosIds.length} técnicos`}}},
+        scales:{
+          x:{grid:{color:'#F3F4F6'},ticks:{callback:v=>fk(v),font:{size:10}}},
+          y:{grid:{display:false},ticks:{font:{size:10}}}
+        }
       }
-    }
-  });
+    });
+  }catch(e){console.warn('chart-coord-overview:',e);}
 }
 
 function filterCoordList(q){coordSearch=q;renderCoordList();}
@@ -2550,7 +2562,22 @@ function showCoordList(){document.getElementById('coord-list-view').style.displa
 function openCoord(cid){
   selCoord=cid;
   updateAIViewContext();
-  const coord=coordData.find(c=>c.id===cid);
+  let coord=coordData.find(c=>c.id===cid);
+  if(!coord&&window._allRealData){
+    // Reconstruir coordinador desde _allRealData filtrado a semana actual
+    const wk=window._currentRealWk;
+    const recs=window._allRealData.filter(t=>t.coordId===cid&&(!wk||t.semana===wk));
+    const recsAll=recs.length?recs:window._allRealData.filter(t=>t.coordId===cid);
+    if(recsAll.length){
+      const ref=recsAll[0];
+      const tecIds=[...new Set(recsAll.map(t=>t.id))];
+      const totalOS=recsAll.reduce((s,t)=>s+t.nOrdenes,0);
+      const sumPct=recsAll.reduce((s,t)=>s+t.pct,0);
+      coord={id:cid,nombre:ref.coordNombre,distrito:ref.distrito,tecnicosIds:tecIds,
+             ordenesSem:totalOS,alcanceMeta:Math.round(sumPct/recsAll.length),
+             prodProm:(totalOS/(tecIds.length||1)/6).toFixed(1)};
+    }
+  }
   if(!coord)return;
   document.getElementById('coord-list-view').style.display='none';
   document.getElementById('coord-detail-view').style.display='';
@@ -2703,25 +2730,27 @@ function renderCoordDetail(coord){
       ctBonos.push(wkTecs.reduce((s,t)=>s+t.bonoFinal,0));
       ctCob.push(wkAct>0?parseFloat((wkTecs.filter(t=>t.bonoFinal>0).length/wkAct*100).toFixed(1)):0);
     });
-    if(chartCoordTrend)chartCoordTrend.destroy();
-    chartCoordTrend=new Chart(document.getElementById('chart-coord-trend'),{
-      type:'bar',
-      data:{labels:ctLabels,datasets:[
-        {type:'bar',label:'Bonos $',data:ctBonos,backgroundColor:'rgba(232,84,32,.65)',borderRadius:4,borderSkipped:false,yAxisID:'y1',order:2},
-        {type:'line',label:'Cobertura %',data:ctCob,borderColor:'#16A34A',backgroundColor:'transparent',tension:.3,pointBackgroundColor:'#16A34A',pointRadius:4,borderWidth:2,yAxisID:'y',order:1}
-      ]},
-      options:{
-        responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-          label:c=>c.datasetIndex===0?`Bonos equipo: ${f$(c.parsed.y)}`:`Cobertura: ${c.parsed.y}%`
-        }}},
-        scales:{
-          x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
-          y:{position:'left',grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:110},
-          y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fk(v),font:{size:10}}}
+    try{
+      if(chartCoordTrend){chartCoordTrend.destroy();chartCoordTrend=null;}
+      chartCoordTrend=new Chart(document.getElementById('chart-coord-trend'),{
+        type:'bar',
+        data:{labels:ctLabels,datasets:[
+          {type:'bar',label:'Bonos $',data:ctBonos,backgroundColor:'rgba(232,84,32,.65)',borderRadius:4,borderSkipped:false,yAxisID:'y1',order:2},
+          {type:'line',label:'Cobertura %',data:ctCob,borderColor:'#16A34A',backgroundColor:'transparent',tension:.3,pointBackgroundColor:'#16A34A',pointRadius:4,borderWidth:2,yAxisID:'y',order:1}
+        ]},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+            label:c=>c.datasetIndex===0?`Bonos equipo: ${f$(c.parsed.y)}`:`Cobertura: ${c.parsed.y}%`
+          }}},
+          scales:{
+            x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
+            y:{position:'left',grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:110},
+            y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fk(v),font:{size:10}}}
+          }
         }
-      }
-    });
+      });
+    }catch(e){console.warn('chart-coord-trend:',e);}
   }
 
   // Ranking table — con ordenamiento
@@ -2823,7 +2852,13 @@ function filterTecLevel(v){tecLevel=v;applyTecFilters();}
 function showTecList(){document.getElementById('tec-list-view').style.display='';document.getElementById('tec-ficha-view').style.display='none';}
 
 function openTecFicha(tid){
-  const t=allData.find(x=>x.id===tid);
+  // Buscar en allData (semana actual) primero; si no está, buscar en _allRealData
+  let t=allData.find(x=>x.id===tid);
+  if(!t&&window._allRealData){
+    // Preferir el registro de la semana seleccionada; si no, cualquier semana
+    t=window._allRealData.find(x=>x.id===tid&&x.semana===window._currentRealWk)
+      ||window._allRealData.find(x=>x.id===tid);
+  }
   if(!t)return;
   selTecnico=tid;
   updateAIViewContext();
@@ -2928,13 +2963,15 @@ function renderFicha(t){
   } else {
     histData=t.historial;
   }
-  if(chartHistorico)chartHistorico.destroy();
-  chartHistorico=new Chart(document.getElementById('chart-historico'),{
-    type:'line',
-    data:{labels:weeks,datasets:[{data:histData,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.4,pointBackgroundColor:'#E85420',pointRadius:4,pointHoverRadius:6,borderWidth:2.5,label:'Bonificación ($)'}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(c.parsed.y)}}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}}}}
-  });
+  try{
+    if(chartHistorico){chartHistorico.destroy();chartHistorico=null;}
+    chartHistorico=new Chart(document.getElementById('chart-historico'),{
+      type:'line',
+      data:{labels:weeks,datasets:[{data:histData,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.4,pointBackgroundColor:'#E85420',pointRadius:4,pointHoverRadius:6,borderWidth:2.5,label:'Bonificación ($)'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(c.parsed.y)}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{ticks:{callback:v=>f$(v),font:{size:10}},grid:{color:'#F3F4F6'}}}}
+    });
+  }catch(e){console.warn('chart-historico:',e);}
 
   // Heatmap — 5 semanas terminando en la semana seleccionada
   document.getElementById('day-detail-panel').style.display='none';
@@ -3070,35 +3107,37 @@ function renderFicha(t){
   const tecTipos={};
   (t.semOrders||[]).forEach(o=>{tecTipos[o.tipo]=(tecTipos[o.tipo]||{cnt:0,pts:0});tecTipos[o.tipo].cnt++;tecTipos[o.tipo].pts+=o.puntos||svcPoints(o.tipo);});
   const sortedTipos=Object.entries(tecTipos).sort((a,b)=>b[1].cnt-a[1].cnt);
-  if(chartTecOS)chartTecOS.destroy();
-  if(sortedTipos.length){
-    chartTecOS=new Chart(document.getElementById('chart-tec-os'),{
-      type:'bar',
-      data:{
-        labels:sortedTipos.map(([tipo])=>tipo),
-        datasets:[
-          {label:'Órdenes',data:sortedTipos.map(([,v])=>v.cnt),backgroundColor:sortedTipos.map((_,i)=>SVC_COLORS[i%SVC_COLORS.length]),borderRadius:4,borderSkipped:false,yAxisID:'y'},
-          {label:'Estrellas ⭐',data:sortedTipos.map(([,v])=>v.pts),backgroundColor:'transparent',borderColor:'rgba(0,0,0,.25)',type:'line',tension:.3,pointRadius:4,borderWidth:1.5,yAxisID:'y1'}
-        ]
-      },
-      options:{
-        indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-          label:c=>c.datasetIndex===0?`${c.parsed.x} órdenes`:`${c.parsed.x} ⭐`
-        }}},
-        scales:{
-          x:{grid:{color:'#F3F4F6'},ticks:{font:{size:10}}},
-          y:{grid:{display:false},ticks:{font:{size:11}}},
-          y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10}},display:false}
+  try{
+    if(chartTecOS){chartTecOS.destroy();chartTecOS=null;}
+    if(sortedTipos.length){
+      chartTecOS=new Chart(document.getElementById('chart-tec-os'),{
+        type:'bar',
+        data:{
+          labels:sortedTipos.map(([tipo])=>tipo),
+          datasets:[
+            {label:'Órdenes',data:sortedTipos.map(([,v])=>v.cnt),backgroundColor:sortedTipos.map((_,i)=>SVC_COLORS[i%SVC_COLORS.length]),borderRadius:4,borderSkipped:false,yAxisID:'y'},
+            {label:'Estrellas ⭐',data:sortedTipos.map(([,v])=>v.pts),backgroundColor:'transparent',borderColor:'rgba(0,0,0,.25)',type:'line',tension:.3,pointRadius:4,borderWidth:1.5,yAxisID:'y1'}
+          ]
+        },
+        options:{
+          indexAxis:'y',responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+            label:c=>c.datasetIndex===0?`${c.parsed.x} órdenes`:`${c.parsed.x} ⭐`
+          }}},
+          scales:{
+            x:{grid:{color:'#F3F4F6'},ticks:{font:{size:10}}},
+            y:{grid:{display:false},ticks:{font:{size:11}}},
+            y1:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10}},display:false}
+          }
         }
-      }
-    });
-  }else{
-    const ctx=document.getElementById('chart-tec-os').getContext('2d');
-    ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
-    ctx.fillStyle='#9CA3AF'; ctx.font='13px Inter,sans-serif'; ctx.textAlign='center';
-    ctx.fillText('Sin órdenes en este período',ctx.canvas.width/2,ctx.canvas.height/2);
-  }
+      });
+    }else{
+      const ctx=document.getElementById('chart-tec-os').getContext('2d');
+      ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+      ctx.fillStyle='#9CA3AF'; ctx.font='13px Inter,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('Sin órdenes en este período',ctx.canvas.width/2,ctx.canvas.height/2);
+    }
+  }catch(e){console.warn('chart-tec-os:',e);}
 
   // Desglose
   document.getElementById('desglose-body').innerHTML=`
