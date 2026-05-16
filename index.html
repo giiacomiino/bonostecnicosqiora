@@ -2214,7 +2214,7 @@ function openDist(d){
   document.getElementById('dist-list-view').style.display='none';
   document.getElementById('dist-detail-view').style.display='';
   updateAIViewContext();
-  renderDistDetail(d);
+  try{renderDistDetail(d);}catch(e){console.error('renderDistDetail error:',e);}
 }
 
 function renderDistDetail(d){
@@ -2561,10 +2561,8 @@ function showCoordList(){document.getElementById('coord-list-view').style.displa
 
 function openCoord(cid){
   selCoord=cid;
-  updateAIViewContext();
   let coord=coordData.find(c=>c.id===cid);
   if(!coord&&window._allRealData){
-    // Reconstruir coordinador desde _allRealData filtrado a semana actual
     const wk=window._currentRealWk;
     const recs=window._allRealData.filter(t=>t.coordId===cid&&(!wk||t.semana===wk));
     const recsAll=recs.length?recs:window._allRealData.filter(t=>t.coordId===cid);
@@ -2578,18 +2576,17 @@ function openCoord(cid){
              prodProm:(totalOS/(tecIds.length||1)/6).toFixed(1)};
     }
   }
-  if(!coord)return;
+  if(!coord){console.warn('openCoord: coordinador no encontrado:',cid);return;}
+  _currentView='coordinadores';
+  // Activar vista ANTES de renderizar
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-i').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-coordinadores').classList.add('active');
+  document.querySelector('.nav-i:nth-child(3)').classList.add('active');
   document.getElementById('coord-list-view').style.display='none';
   document.getElementById('coord-detail-view').style.display='';
-  renderCoordDetail(coord);
-  // Switch to coordinadores view if needed
-  const v=document.getElementById('view-coordinadores');
-  if(!v.classList.contains('active')){
-    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
-    document.querySelectorAll('.nav-i').forEach(x=>x.classList.remove('active'));
-    v.classList.add('active');
-    document.querySelector('.nav-i:nth-child(3)').classList.add('active');
-  }
+  updateAIViewContext();
+  try{renderCoordDetail(coord);}catch(e){console.error('renderCoordDetail error:',e);}
 }
 
 function renderCoordDetail(coord){
@@ -2855,22 +2852,21 @@ function openTecFicha(tid){
   // Buscar en allData (semana actual) primero; si no está, buscar en _allRealData
   let t=allData.find(x=>x.id===tid);
   if(!t&&window._allRealData){
-    // Preferir el registro de la semana seleccionada; si no, cualquier semana
     t=window._allRealData.find(x=>x.id===tid&&x.semana===window._currentRealWk)
       ||window._allRealData.find(x=>x.id===tid);
   }
-  if(!t)return;
+  if(!t){console.warn('openTecFicha: técnico no encontrado:',tid);return;}
   selTecnico=tid;
+  _currentView='tecnicos';
   updateAIViewContext();
+  // Activar vista ANTES de renderizar — así la navegación ocurre aunque renderFicha lance error
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-i').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-tecnicos').classList.add('active');
+  document.querySelector('.nav-i:nth-child(4)').classList.add('active');
   document.getElementById('tec-list-view').style.display='none';
   document.getElementById('tec-ficha-view').style.display='';
-  renderFicha(t);
-  // Ensure tecnicos view is active
-  if(!document.getElementById('view-tecnicos').classList.contains('active')){
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    document.querySelectorAll('.nav-i').forEach(v=>v.classList.remove('active'));
-    document.getElementById('view-tecnicos').classList.add('active');
-  }
+  try{renderFicha(t);}catch(e){console.error('renderFicha error:',e);}
 }
 
 function renderFicha(t){
