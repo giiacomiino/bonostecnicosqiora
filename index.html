@@ -2256,21 +2256,23 @@ function renderDistDetail(d){
   const extra110=tecs.reduce((s,t)=>s+t.bono110,0);
   const descTotal=tecs.reduce((s,t)=>s+t.descuento,0);
   const netoFinal=tecs.reduce((s,t)=>s+t.bonoFinal,0);
-  if(chartCascade)chartCascade.destroy();
-  chartCascade=new Chart(document.getElementById('chart-cascade'),{
-    type:'bar',
-    data:{
-      labels:['Bono Base',extra110>0?'+ Extra 110%':null,'− Descuentos','Neto Final'].filter(Boolean),
-      datasets:[{
-        data:[baseB,extra110>0?extra110:null,descTotal>0?-descTotal:null,netoFinal].filter(v=>v!==null),
-        backgroundColor:[baseB>0?'#C8D0E0':'#eee',extra110>0?'#16A34A':null,descTotal>0?'#FCA5A5':null,'#E85420'].filter(v=>v!==null),
-        borderRadius:4,borderSkipped:false
-      }]
-    },
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(Math.abs(c.parsed.y))}}},
-      scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>fk(Math.abs(v)),font:{size:10}},grid:{color:'#F3F4F6'}}}}
-  });
+  try{
+    if(chartCascade){chartCascade.destroy();chartCascade=null;}
+    // Fix: align labels/data (−Descuentos only shown when descTotal>0)
+    const cascLabels=['Bono Base',...(extra110>0?['+ Extra 110%']:[]),...(descTotal>0?['− Descuentos']:[]),'Neto Final'];
+    const cascData=[baseB,...(extra110>0?[extra110]:[]),...(descTotal>0?[-descTotal]:[]),netoFinal];
+    const cascColors=['#C8D0E0',...(extra110>0?['#16A34A']:[]),...(descTotal>0?['#FCA5A5']:[]),'#E85420'];
+    chartCascade=new Chart(document.getElementById('chart-cascade'),{
+      type:'bar',
+      data:{
+        labels:cascLabels,
+        datasets:[{data:cascData,backgroundColor:cascColors,borderRadius:4,borderSkipped:false}]
+      },
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>f$(Math.abs(c.parsed.y))}}},
+        scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>fk(Math.abs(v)),font:{size:10}},grid:{color:'#F3F4F6'}}}}
+    });
+  }catch(e){console.warn('chart-cascade:',e);}
 
   // Top coordinadores del distrito — ordenados por bono total del equipo, descendente
   const distCoordsRaw=coordData.filter(c=>c.distrito===d).map(c=>{
@@ -2338,28 +2340,30 @@ function renderDistDetail(d){
   dBuckets.forEach(b=>{
     _distInaGroups.push({bucket:b,grp:tecs.filter(t=>t.inas>=b.min&&t.inas<b.max)});
   });
-  if(chartDistIna)chartDistIna.destroy();
-  chartDistIna=new Chart(document.getElementById('chart-dist-ina'),{
-    type:'bar',
-    data:{
-      labels:dBuckets.map(b=>b.label),
-      datasets:[{
-        label:'Cuadrillas',
-        data:dBuckets.map(b=>tecs.filter(t=>t.inas>=b.min&&t.inas<b.max).length),
-        backgroundColor:dBuckets.map(b=>b.color+'BB'),
-        borderRadius:4,borderSkipped:false
-      }]
-    },
-    options:{
-      responsive:true,maintainAspectRatio:false,
-      onClick:(evt,els)=>{if(els.length)showInaDrill(els[0].index,true);},
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} cuadrilla(s) · clic para desglose`}}},
-      scales:{
-        x:{grid:{display:false},ticks:{font:{size:11}}},
-        y:{ticks:{stepSize:1,font:{size:10}},grid:{color:'#F3F4F6'}}
+  try{
+    if(chartDistIna){chartDistIna.destroy();chartDistIna=null;}
+    chartDistIna=new Chart(document.getElementById('chart-dist-ina'),{
+      type:'bar',
+      data:{
+        labels:dBuckets.map(b=>b.label),
+        datasets:[{
+          label:'Cuadrillas',
+          data:dBuckets.map(b=>tecs.filter(t=>t.inas>=b.min&&t.inas<b.max).length),
+          backgroundColor:dBuckets.map(b=>b.color+'BB'),
+          borderRadius:4,borderSkipped:false
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        onClick:(evt,els)=>{if(els.length)showInaDrill(els[0].index,true);},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y} cuadrilla(s) · clic para desglose`}}},
+        scales:{
+          x:{grid:{display:false},ticks:{font:{size:11}}},
+          y:{ticks:{stepSize:1,font:{size:10}},grid:{color:'#F3F4F6'}}
+        }
       }
-    }
-  });
+    });
+  }catch(e){console.warn('chart-dist-ina:',e);}
   // Tabla resumen de inasistencias del distrito (clickeable)
   const inaDistWrap=document.getElementById('ina-dist-detail-wrap');
   if(inaDistWrap){
@@ -2445,25 +2449,27 @@ function renderDistDetail(d){
       dtCob.push(wkAct>0?parseFloat((wkCob/wkAct*100).toFixed(1)):0);
       dtBonos.push(wkTecs.reduce((s,t)=>s+t.bonoFinal,0));
     });
-    if(chartDistTrend)chartDistTrend.destroy();
-    chartDistTrend=new Chart(document.getElementById('chart-dist-trend'),{
-      type:'bar',
-      data:{labels:dtLabels,datasets:[
-        {type:'bar',label:'Bonos $',data:dtBonos,backgroundColor:'rgba(37,99,235,.6)',borderRadius:4,borderSkipped:false,yAxisID:'y1',order:2},
-        {type:'line',label:'Cobertura %',data:dtCob,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.3,pointBackgroundColor:'#E85420',pointRadius:4,borderWidth:2.5,yAxisID:'y',order:1}
-      ]},
-      options:{
-        responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
-          label:c=>c.datasetIndex===0?`Bonos: ${f$(c.parsed.y)}`:`Cobertura: ${c.parsed.y}%`
-        }}},
-        scales:{
-          x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
-          y:{position:'left',grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:110},
-          y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fk(v),font:{size:10}}}
+    try{
+      if(chartDistTrend){chartDistTrend.destroy();chartDistTrend=null;}
+      chartDistTrend=new Chart(document.getElementById('chart-dist-trend'),{
+        type:'bar',
+        data:{labels:dtLabels,datasets:[
+          {type:'bar',label:'Bonos $',data:dtBonos,backgroundColor:'rgba(37,99,235,.6)',borderRadius:4,borderSkipped:false,yAxisID:'y1',order:2},
+          {type:'line',label:'Cobertura %',data:dtCob,borderColor:'#E85420',backgroundColor:'rgba(232,84,32,.08)',fill:true,tension:.3,pointBackgroundColor:'#E85420',pointRadius:4,borderWidth:2.5,yAxisID:'y',order:1}
+        ]},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,callbacks:{
+            label:c=>c.datasetIndex===0?`Bonos: ${f$(c.parsed.y)}`:`Cobertura: ${c.parsed.y}%`
+          }}},
+          scales:{
+            x:{grid:{display:false},ticks:{font:{size:10},maxRotation:30}},
+            y:{position:'left',grid:{color:'#F3F4F6'},ticks:{callback:v=>v+'%',font:{size:10}},min:0,max:110},
+            y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fk(v),font:{size:10}}}
+          }
         }
-      }
-    });
+      });
+    }catch(e){console.warn('chart-dist-trend:',e);}
   }
 }
 
@@ -4599,9 +4605,6 @@ async function miniSendAI(view){
 let _aiSending=false;
 async function sendAI(){
   if(_aiSending)return;
-  // Immediate visual feedback on click
-  const _sendBtn=document.getElementById('ai-send-btn');
-  if(_sendBtn){_sendBtn.style.transform='scale(0.88)';setTimeout(()=>{if(_sendBtn)_sendBtn.style.transform=''},120);}
   let key=(localStorage.getItem('qiora_gemini_key')||'').trim();
   if(!key){
     // Si el usuario escribió la key en el campo pero no la guardó, úsala automáticamente
@@ -4610,17 +4613,12 @@ async function sendAI(){
     else{
       document.getElementById('ai-key-panel').style.display='block';
       document.getElementById('ai-key-input').focus();
-      document.getElementById('ai-key-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
-      addBubble('ai','Necesitas tu **Gemini API key** para usar QiORA AI.\n\nHaz clic en **Configurar** (arriba a la derecha del banner) → pega tu key → **Guardar**.\n\nLa key nunca sale de tu navegador.');
       return;
     }
   }
   const input=document.getElementById('ai-input');
   const question=input.value.trim();
-  if(!question){
-    addBubble('ai','Escribe tu pregunta en el campo de texto y luego haz clic en enviar.');
-    return;
-  }
+  if(!question)return;
 
   _aiSending=true;
   const btn=document.getElementById('ai-send-btn');
