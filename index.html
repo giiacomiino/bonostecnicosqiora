@@ -367,6 +367,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     <div id="data-source-info" style="margin-top:8px;font-size:10px;color:var(--text3);text-align:center;line-height:1.4">
       Datos: <span id="source-label" style="color:var(--text3);font-weight:600">Sin datos</span>
     </div>
+    <div id="commit-badge" title="Último commit en GitHub" style="margin-top:6px;font-size:9px;color:var(--text3);text-align:center;font-family:monospace;padding:3px 6px;background:#F5F5F7;border-radius:4px;opacity:.75;line-height:1.5">v—</div>
   </div>
 </nav>
 
@@ -1205,6 +1206,23 @@ document.addEventListener('DOMContentLoaded',()=>{
     const el=document.getElementById(id);
     if(el)el.src=QIORA_LOGO;
   });
+  // Mostrar último commit de GitHub
+  const badge=document.getElementById('commit-badge');
+  if(badge){
+    fetch('https://api.github.com/repos/giiacomiino/bonostecnicosqiora/commits/main',
+      {headers:{'Accept':'application/vnd.github.v3+json'}})
+    .then(r=>r.ok?r.json():null)
+    .then(d=>{
+      if(!d||!d.sha)return;
+      const hash=d.sha.slice(0,7);
+      const raw=d.commit?.committer?.date||d.commit?.author?.date||'';
+      const dt=raw?new Date(raw):null;
+      const label=dt?`${hash} · ${dt.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit'})} ${dt.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}`:hash;
+      badge.textContent=label;
+      badge.title=`Último commit: ${d.commit?.message?.split('\n')[0]||''}\n${raw}`;
+    })
+    .catch(()=>{badge.textContent='v—';});
+  }
 });
 // ═══════════════════════════════════════════
 // SUPABASE
@@ -1752,9 +1770,9 @@ const f$=n=>{if(n===null||n===undefined||isNaN(n))return '$0';return '$'+Math.ro
 const fBubble=n=>{if(!n&&n!==0)return '$0';const abs=Math.abs(n),sign=n<0?'−':'';if(abs>=1e6)return sign+'$'+(abs/1e6).toFixed(2)+'M';if(abs>=1e3)return sign+'$'+(abs/1e3).toFixed(2)+'k';return sign+'$'+Math.round(abs);};
 const fM=n=>f$(n);
 const fk=n=>f$(n);
-const fp=n=>n.toFixed(1)+'%';
-const distShort=d=>d.replace('CTA-TPI-INT-','');
-function initials(n){const p=n.split(' ');return((p[0]||'')[0]+(p[1]||'')[0]).toUpperCase();}
+const fp=n=>(n!=null&&!isNaN(n)?Number(n).toFixed(1):'0.0')+'%';
+const distShort=d=>(d||'').replace('CTA-TPI-INT-','');
+function initials(n){if(!n||typeof n!=='string')return'??';const s=n.trim();if(!s)return'??';const p=s.split(' ');const a=(p[0]||'')[0]||'';const b=(p[1]||'')[0]||'';return(a+b).toUpperCase()||s[0].toUpperCase()||'??';}
 function pctColor(p){return p>=100?'var(--green)':p>=80?'var(--or)':'var(--red)';}
 function pctBadge(p){
   const cls=p>=110?'st-green':p>=100?'st-green':p>=90?'st-orange':p>=80?'st-yellow':'st-red';
@@ -1771,6 +1789,7 @@ function miniBar(pct,color){
   </div>`;
 }
 function avatarGradient(s){
+  if(!s||typeof s!=='string')return'linear-gradient(135deg,#E85420,#FF8C5A)';
   const idx=s.split('').reduce((a,c)=>a+c.charCodeAt(0),0)%5;
   const grads=[['#E85420','#FF8C5A'],['#2563EB','#60A5FA'],['#16A34A','#4ADE80'],['#7C3AED','#A78BFA'],['#D97706','#FCD34D']];
   return `linear-gradient(135deg,${grads[idx][0]},${grads[idx][1]})`;
@@ -2576,7 +2595,11 @@ function openCoord(cid){
              prodProm:(totalOS/(tecIds.length||1)/6).toFixed(1)};
     }
   }
-  if(!coord){console.warn('openCoord: coordinador no encontrado:',cid);return;}
+  if(!coord){
+    console.warn('openCoord: coordinador no encontrado. cid=',cid,'coordData.length=',coordData.length,'IDs sample=',(coordData.slice(0,5).map(c=>c.id)));
+    return;
+  }
+  console.log('openCoord → encontrado:',coord.id,coord.nombre,'techs=',coord.tecnicosIds?.length);
   _currentView='coordinadores';
   // Activar vista ANTES de renderizar
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
@@ -2586,10 +2609,34 @@ function openCoord(cid){
   document.getElementById('coord-list-view').style.display='none';
   document.getElementById('coord-detail-view').style.display='';
   updateAIViewContext();
-  try{renderCoordDetail(coord);}catch(e){console.error('renderCoordDetail error:',e);}
+  try{
+    renderCoordDetail(coord);
+  }catch(e){
+    console.error('renderCoordDetail error:',e,'\ncoord:',JSON.stringify(coord,null,2));
+    // Mostrar error visible en lugar de vista en blanco
+    const dv=document.getElementById('coord-detail-view');
+    if(dv)dv.innerHTML=`
+      <button class="back-btn" onclick="showCoordList()">
+        <svg viewBox="0 0 24 24" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Volver a lista
+      </button>
+      <div style="padding:32px;text-align:center;color:var(--red)">
+        <div style="font-size:15px;font-weight:700;margin-bottom:8px">Error al mostrar el coordinador</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Coordinador: <strong>${coord.nombre||cid}</strong></div>
+        <div style="font-size:11px;font-family:monospace;background:#FEE2E2;padding:10px;border-radius:8px;text-align:left;max-width:500px;margin:0 auto">${e.message}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:10px">Revisa la consola del navegador (F12) para más detalles.</div>
+      </div>`;
+  }
 }
 
 function renderCoordDetail(coord){
+  if(!coord){throw new Error('renderCoordDetail: coord is null/undefined');}
+  // Normalizar campos críticos
+  if(!coord.nombre)coord.nombre='—';
+  if(!coord.distrito)coord.distrito='—';
+  if(coord.alcanceMeta==null||isNaN(coord.alcanceMeta))coord.alcanceMeta=0;
+  if(!coord.tecnicosIds)coord.tecnicosIds=[];
+  console.log('renderCoordDetail: nombre=',coord.nombre,'id=',coord.id,'techs=',coord.tecnicosIds.length);
   // Siempre reiniciar el sort del ranking de técnicos a descendente (dir=1 = mayor primero) al abrir un coordinador
   _sort.coordTecs={col:'pct',dir:1};
   document.getElementById('coord-detail-name').textContent=coord.nombre;
@@ -2855,7 +2902,16 @@ function openTecFicha(tid){
     t=window._allRealData.find(x=>x.id===tid&&x.semana===window._currentRealWk)
       ||window._allRealData.find(x=>x.id===tid);
   }
-  if(!t){console.warn('openTecFicha: técnico no encontrado:',tid);return;}
+  // Si aún no se encuentra, intentar búsqueda flexible (sin distinguir mayúsculas ni espacios extra)
+  if(!t){
+    const tidLower=tid.toLowerCase().trim();
+    t=(window._allRealData||allData).find(x=>x.id.toLowerCase().trim()===tidLower);
+  }
+  if(!t){
+    console.warn('openTecFicha: técnico no encontrado. tid=',tid,'allData.length=',allData.length,'IDs sample=',(allData.slice(0,5).map(x=>x.id)));
+    return;
+  }
+  console.log('openTecFicha → encontrado:',t.id,t.nombre,'pct=',t.pct,'semana=',t.semana);
   selTecnico=tid;
   _currentView='tecnicos';
   updateAIViewContext();
@@ -2866,10 +2922,42 @@ function openTecFicha(tid){
   document.querySelector('.nav-i:nth-child(4)').classList.add('active');
   document.getElementById('tec-list-view').style.display='none';
   document.getElementById('tec-ficha-view').style.display='';
-  try{renderFicha(t);}catch(e){console.error('renderFicha error:',e);}
+  try{
+    renderFicha(t);
+  }catch(e){
+    console.error('renderFicha error:',e,'\ntécnico:',JSON.stringify(t,null,2));
+    // Mostrar error visible en lugar de vista en blanco
+    const fc=document.getElementById('tec-ficha-view');
+    if(fc)fc.innerHTML=`
+      <button class="back-btn" onclick="showTecList()">
+        <svg viewBox="0 0 24 24" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        Volver a lista
+      </button>
+      <div style="padding:32px;text-align:center;color:var(--red)">
+        <div style="font-size:15px;font-weight:700;margin-bottom:8px">Error al mostrar la ficha</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Técnico: <strong>${t.nombre||tid}</strong></div>
+        <div style="font-size:11px;font-family:monospace;background:#FEE2E2;padding:10px;border-radius:8px;text-align:left;max-width:500px;margin:0 auto">${e.message}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:10px">Revisa la consola del navegador (F12) para más detalles.</div>
+      </div>`;
+  }
 }
 
 function renderFicha(t){
+  if(!t){throw new Error('renderFicha: t is null/undefined');}
+  // Normalizar campos críticos para evitar errores de tipo
+  if(t.pct==null||isNaN(t.pct))t.pct=0;
+  if(t.estrellas==null||isNaN(t.estrellas))t.estrellas=0;
+  if(t.meta==null||isNaN(t.meta))t.meta=84;
+  if(t.dias==null||isNaN(t.dias))t.dias=0;
+  if(t.inas==null||isNaN(t.inas))t.inas=0;
+  if(t.bonoFinal==null||isNaN(t.bonoFinal))t.bonoFinal=0;
+  if(t.bonoBase==null||isNaN(t.bonoBase))t.bonoBase=0;
+  if(!t.nombre||typeof t.nombre!=='string')t.nombre=t.id||'Sin nombre';
+  if(!t.coordNombre)t.coordNombre='—';
+  if(!t.skill)t.skill='—';
+  if(!t.distrito)t.distrito='—';
+  if(!t.tipo)t.tipo='B';
+  console.log('renderFicha: nombre=',t.nombre,'pct=',t.pct,'id=',t.id);
   // Profile card
   document.getElementById('tec-profile-card').innerHTML=`
     <div class="tec-av" style="background:${avatarGradient(t.nombre)}">
