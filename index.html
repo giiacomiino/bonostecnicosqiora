@@ -2606,7 +2606,7 @@ function openCoord(cid){
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-i').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-coordinadores').classList.add('active');
-  document.querySelector('.nav-i:nth-child(3)').classList.add('active');
+  document.querySelectorAll('.nav-i')[2].classList.add('active');
   document.getElementById('coord-list-view').style.display='none';
   document.getElementById('coord-detail-view').style.display='';
   updateAIViewContext();
@@ -2920,7 +2920,7 @@ function openTecFicha(tid){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.querySelectorAll('.nav-i').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-tecnicos').classList.add('active');
-  document.querySelector('.nav-i:nth-child(4)').classList.add('active');
+  document.querySelectorAll('.nav-i')[3].classList.add('active');
   document.getElementById('tec-list-view').style.display='none';
   document.getElementById('tec-ficha-view').style.display='';
   try{
