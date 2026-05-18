@@ -2230,6 +2230,7 @@ function showDistList(){document.getElementById('dist-list-view').style.display=
 
 function openDist(d){
   selDistrito=d;
+  _currentView='distritos';
   document.getElementById('dist-list-view').style.display='none';
   document.getElementById('dist-detail-view').style.display='';
   updateAIViewContext();
@@ -4323,7 +4324,6 @@ renderConfig();
 // Iniciar carga de config antes que los datos — garantiza METAS idénticos en ambas rutas
 _configReady = loadConfig();
 loadFromSupabase();
-initAI();
 
 // ═══════════════════════════════════════════
 // QIORA AI — Gemini Integration
@@ -4597,7 +4597,11 @@ const AI_SUGGESTIONS={
   ]
 };
 
+// Inicializar AI después de que AI_SUGGESTIONS esté disponible
+initAI();
+
 function updateAIViewContext(){
+  if(typeof AI_SUGGESTIONS==='undefined'||!AI_SUGGESTIONS)return;
   const view=_currentView||'nacional';
   const sug=AI_SUGGESTIONS[view]||AI_SUGGESTIONS.nacional;
   const subtitle=sug[0];
