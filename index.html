@@ -1011,6 +1011,27 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       <div id="cfg-saved-msg" style="display:none;margin-top:14px;background:var(--green-l);color:var(--green);border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600">
         ✓ Configuración guardada — bonos recalculados correctamente.
       </div>
+
+      <!-- ── Contexto para QiORA AI ── -->
+      <div style="margin-top:28px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Contexto para QiORA AI</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:3px;max-width:520px">Datos numéricos completos que recibe la AI al responder preguntas. Se regenera automáticamente al cargar datos. Puedes editarlo manualmente para agregar contexto adicional o correcciones.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+            <span id="ai-ctx-chars" style="font-size:11px;color:var(--text3)">— caracteres</span>
+            <button onclick="refreshAIContextTextarea()" style="background:var(--or);color:white;border:none;border-radius:8px;padding:8px 16px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <svg width="13" height="13" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+              Regenerar desde datos
+            </button>
+          </div>
+        </div>
+        <textarea id="ai-context-editor" spellcheck="false"
+          oninput="document.getElementById('ai-ctx-chars').textContent=this.value.length.toLocaleString('es-MX')+' caracteres'"
+          style="width:100%;min-height:420px;font-family:'Courier New',monospace;font-size:11px;line-height:1.65;border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:#FAFAFA;color:var(--text);resize:vertical;box-sizing:border-box;outline:none"
+          placeholder="Carga datos primero (Excel o Supabase) para generar el contexto automáticamente."></textarea>
+      </div>
     </div><!-- /config -->
 
     <!-- ══════ VIEW: CÁLCULO DE BONOS ══════ -->
@@ -3811,6 +3832,7 @@ function rebuildFromRawOrders(){
   window._allRealData=newData;
   coordData=newCoordArr;
   allData=window._currentRealWk?newData.filter(t=>t.semana===window._currentRealWk):newData;
+  refreshAIContextTextarea();
 }
 
 // Agrupa múltiples registros (tech,semana) en uno por técnico — para vista mensual
@@ -4560,6 +4582,73 @@ function _ctxTecnico(){
   return ctx;
 }
 
+// ── Contexto completo (todo el historial, sin límite de semanas) ─────────────
+function buildFullAIContext(){
+  const data=window._allRealData;
+  if(!data||!data.length)return'Sin datos cargados.';
+
+  const weeks=[...new Set(data.map(d=>d.wk))].sort();
+
+  // 1. Configuración del sistema
+  let ctx='═══ CONFIGURACIÓN DEL SISTEMA ═══\n';
+  ctx+='BONOS BASE:\n';
+  ctx+='Tipo A: 80-89%=$500 | 90-99%=$900 | 100%+=$2,500 | Extra ≥110%=+$500 fijo\n';
+  ctx+='Tipo B: 80-89%=$450 | 90-99%=$800 | 100%+=$1,800 | Extra ≥100%=+$100/6⭐ máx$500\n';
+  ctx+='Tipo C: 80-89%=$300 | 90-99%=$700 | 100%+=$1,400 | Extra ≥100%=+$100/6⭐ máx$500\n';
+  ctx+='Descuento inasistencia (7 distritos con penalización): 6días=sin descuento | 5días=-50% | ≤4días=-100%\n';
+  ctx+='Puntaje OS: Instalación=6 | Soporte=3 | Mant.Mayor=4 | Mant.=3 | Addons=2 | CambioDomicilio=6 | CambioEquipo=2 | SoporteEmp=5 | InstalEmp=8 | Recolección=1 | Factibilidad=1 | CambioPlan=2\n\n';
+
+  // 2. Semanas
+  ctx+='SEMANAS EN DATOS ('+weeks.length+'): '+weeks.join(', ')+'\n\n';
+
+  // 3. Resumen nacional por semana
+  ctx+='═══ RESUMEN NACIONAL POR SEMANA ═══\n';
+  ctx+='semana|techs|bonos_total|avg%meta|100%+|90-99%|80-89%|<80%|con_inas|bono_prom\n';
+  const wkNac={};
+  data.forEach(d=>{
+    if(!wkNac[d.wk])wkNac[d.wk]={wk:d.wk,b:0,n:0,sp:0,t100:0,t90:0,t80:0,tB:0,inas:0};
+    const w=wkNac[d.wk];w.n++;w.b+=d.bonoFinal||0;w.sp+=(d.pct||0);
+    if(d.pct>=100)w.t100++;else if(d.pct>=90)w.t90++;else if(d.pct>=80)w.t80++;else w.tB++;
+    if((d.inas||0)>0)w.inas++;
+  });
+  Object.values(wkNac).sort((a,b)=>a.wk.localeCompare(b.wk)).forEach(w=>{
+    ctx+=`${w.wk}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.t90}|${w.t80}|${w.tB}|${w.inas}|${w.n?Math.round(w.b/w.n):0}\n`;
+  });
+
+  // 4. Resumen por distrito × semana
+  ctx+='\n═══ RESUMEN POR DISTRITO × SEMANA ═══\n';
+  ctx+='semana|distrito|tipo_dist|penaliz|techs|bonos_total|avg%meta|al100%|<80%|con_inas\n';
+  const wkD={};
+  data.forEach(d=>{
+    const k=d.wk+'||'+d.distrito;
+    if(!wkD[k])wkD[k]={wk:d.wk,dist:(d.distrito||'').replace('CTA-TPI-INT-',''),tipo:d.tipoDistrito||'B',pen:d.penalizacion?'SI':'NO',b:0,n:0,sp:0,t100:0,tB:0,inas:0};
+    const w=wkD[k];w.n++;w.b+=d.bonoFinal||0;w.sp+=(d.pct||0);
+    if(d.pct>=100)w.t100++;else if(d.pct<80)w.tB++;
+    if((d.inas||0)>0)w.inas++;
+  });
+  Object.values(wkD).sort((a,b)=>a.wk.localeCompare(b.wk)||a.dist.localeCompare(b.dist)).forEach(w=>{
+    ctx+=`${w.wk}|${w.dist}|${w.tipo}|${w.pen}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.tB}|${w.inas}\n`;
+  });
+
+  // 5. Detalle completo técnico × semana
+  ctx+='\n═══ DETALLE TÉCNICO × SEMANA ═══\n';
+  ctx+='semana|técnico|coordinador|distrito|tipo_dist|skill|estrellas|meta|%meta|bono_base|bono_extra|bono_final|dias_trab|inasistencias\n';
+  [...data].sort((a,b)=>a.wk.localeCompare(b.wk)||a.nombre.localeCompare(b.nombre)).forEach(d=>{
+    ctx+=`${d.wk}|${d.nombre}|${d.coord||'-'}|${(d.distrito||'').replace('CTA-TPI-INT-','')}|${d.tipoDistrito||'B'}|${d.skill||'-'}|${d.estrellas||0}|${d.meta||0}|${(d.pct||0).toFixed(1)}%|${d.bonoBase||0}|${d.bonoExtra||0}|${d.bonoFinal||0}|${d.diasTrab||0}|${d.inas||0}\n`;
+  });
+
+  return ctx;
+}
+
+function refreshAIContextTextarea(){
+  const ta=document.getElementById('ai-context-editor');
+  if(!ta)return;
+  const ctx=buildFullAIContext();
+  ta.value=ctx;
+  const el=document.getElementById('ai-ctx-chars');
+  if(el)el.textContent=ctx.length.toLocaleString('es-MX')+' caracteres';
+}
+
 function buildAIContext(){
   if(!window._allRealData||!window._allRealData.length)return'Sin datos cargados.';
   const view=_currentView;
@@ -4707,7 +4796,8 @@ async function miniSendAI(view){
 
   try{
     const savedView=_currentView;_currentView=view;
-    const dataCtx=buildAIContext();_currentView=savedView;
+    const ta=document.getElementById('ai-context-editor');
+    const dataCtx=(ta&&ta.value.trim())?ta.value.trim():buildAIContext();_currentView=savedView;
     const model=localStorage.getItem('qiora_gemini_model')||'gemini-2.5-flash';
     const fullText=`${AI_SYSTEM_PROMPT}\n\n---\n${dataCtx}\n\nPREGUNTA DEL USUARIO: ${question}`;
     const resp=await fetch(
@@ -4755,7 +4845,8 @@ async function sendAI(){
     document.getElementById('ai-suggestions').style.display='none';
     addBubble('user',question);
     addBubble('thinking');
-    const dataCtx=buildAIContext();
+    const ta=document.getElementById('ai-context-editor');
+    const dataCtx=(ta&&ta.value.trim())?ta.value.trim():buildAIContext();
     const model=document.getElementById('ai-model-sel').value||'gemini-2.5-flash';
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),60000);
