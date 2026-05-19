@@ -4611,7 +4611,7 @@ function buildFullAIContext(){
     if(d.pct>=100)w.t100++;else if(d.pct>=90)w.t90++;else if(d.pct>=80)w.t80++;else w.tB++;
     if((d.inas||0)>0)w.inas++;
   });
-  Object.values(wkNac).sort((a,b)=>a.wk.localeCompare(b.wk)).forEach(w=>{
+  Object.values(wkNac).sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')).forEach(w=>{
     ctx+=`${w.wk}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.t90}|${w.t80}|${w.tB}|${w.inas}|${w.n?Math.round(w.b/w.n):0}\n`;
   });
 
@@ -4620,20 +4620,20 @@ function buildFullAIContext(){
   ctx+='semana|distrito|tipo_dist|penaliz|techs|bonos_total|avg%meta|al100%|<80%|con_inas\n';
   const wkD={};
   data.forEach(d=>{
-    const k=d.wk+'||'+d.distrito;
-    if(!wkD[k])wkD[k]={wk:d.wk,dist:(d.distrito||'').replace('CTA-TPI-INT-',''),tipo:d.tipoDistrito||'B',pen:d.penalizacion?'SI':'NO',b:0,n:0,sp:0,t100:0,tB:0,inas:0};
+    const k=(d.wk||'')+'||'+(d.distrito||'');
+    if(!wkD[k])wkD[k]={wk:d.wk||'',dist:(d.distrito||'').replace('CTA-TPI-INT-',''),tipo:d.tipoDistrito||'B',pen:d.penalizacion?'SI':'NO',b:0,n:0,sp:0,t100:0,tB:0,inas:0};
     const w=wkD[k];w.n++;w.b+=d.bonoFinal||0;w.sp+=(d.pct||0);
     if(d.pct>=100)w.t100++;else if(d.pct<80)w.tB++;
     if((d.inas||0)>0)w.inas++;
   });
-  Object.values(wkD).sort((a,b)=>a.wk.localeCompare(b.wk)||a.dist.localeCompare(b.dist)).forEach(w=>{
+  Object.values(wkD).sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')||(a.dist||'').localeCompare(b.dist||'')).forEach(w=>{
     ctx+=`${w.wk}|${w.dist}|${w.tipo}|${w.pen}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.tB}|${w.inas}\n`;
   });
 
   // 5. Detalle completo técnico × semana
   ctx+='\n═══ DETALLE TÉCNICO × SEMANA ═══\n';
   ctx+='semana|técnico|coordinador|distrito|tipo_dist|skill|estrellas|meta|%meta|bono_base|bono_extra|bono_final|dias_trab|inasistencias\n';
-  [...data].sort((a,b)=>a.wk.localeCompare(b.wk)||a.nombre.localeCompare(b.nombre)).forEach(d=>{
+  [...data].sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')||(a.nombre||'').localeCompare(b.nombre||'')).forEach(d=>{
     ctx+=`${d.wk}|${d.nombre}|${d.coord||'-'}|${(d.distrito||'').replace('CTA-TPI-INT-','')}|${d.tipoDistrito||'B'}|${d.skill||'-'}|${d.estrellas||0}|${d.meta||0}|${(d.pct||0).toFixed(1)}%|${d.bonoBase||0}|${d.bonoExtra||0}|${d.bonoFinal||0}|${d.diasTrab||0}|${d.inas||0}\n`;
   });
 
