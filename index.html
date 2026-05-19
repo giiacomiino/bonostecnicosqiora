@@ -4611,31 +4611,41 @@ function buildFullAIContext(){
 
   // 3. Resumen nacional por semana
   ctx+='═══ RESUMEN NACIONAL POR SEMANA ═══\n';
-  ctx+='periodo(lun/dom)|techs|bonos_total|avg%meta|100%+|90-99%|80-89%|<80%|con_inas|bono_prom\n';
+  ctx+='periodo(lun/dom)|techs_activos|bonos_total|avg%meta|100%+|90-99%|80-89%|<80%|con_inas|bono_prom\n';
   const wkNac={};
   data.forEach(d=>{
-    if(!wkNac[d.wk])wkNac[d.wk]={wk:d.wk,b:0,n:0,sp:0,t100:0,t90:0,t80:0,tB:0,inas:0};
-    const w=wkNac[d.wk];w.n++;w.b+=d.bonoFinal||0;w.sp+=(d.pct||0);
+    if((d.nOrdenes||0)===0)return; // solo técnicos activos
+    if(!wkNac[d.wk])wkNac[d.wk]={wk:d.wk,ids:new Set(),b:0,sp:0,t100:0,t90:0,t80:0,tB:0,inas:0};
+    const w=wkNac[d.wk];
+    if(w.ids.has(d.id))return; // deduplicar por ffm
+    w.ids.add(d.id);
+    w.b+=d.bonoFinal||0;w.sp+=(d.pct||0);
     if(d.pct>=100)w.t100++;else if(d.pct>=90)w.t90++;else if(d.pct>=80)w.t80++;else w.tB++;
     if((d.inas||0)>0)w.inas++;
   });
   Object.values(wkNac).sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')).forEach(w=>{
-    ctx+=`${_wkRange(w.wk)}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.t90}|${w.t80}|${w.tB}|${w.inas}|${w.n?Math.round(w.b/w.n):0}\n`;
+    const n=w.ids.size;
+    ctx+=`${_wkRange(w.wk)}|${n}|${w.b}|${n?(w.sp/n).toFixed(1):0}%|${w.t100}|${w.t90}|${w.t80}|${w.tB}|${w.inas}|${n?Math.round(w.b/n):0}\n`;
   });
 
   // 4. Resumen por distrito × semana
   ctx+='\n═══ RESUMEN POR DISTRITO × SEMANA ═══\n';
-  ctx+='periodo(lun/dom)|distrito|tipo_dist|penaliz|techs|bonos_total|avg%meta|al100%|<80%|con_inas\n';
+  ctx+='periodo(lun/dom)|distrito|tipo_dist|penaliz|techs_activos|bonos_total|avg%meta|al100%|<80%|con_inas\n';
   const wkD={};
   data.forEach(d=>{
+    if((d.nOrdenes||0)===0)return;
     const k=(d.wk||'')+'||'+(d.distrito||'');
-    if(!wkD[k])wkD[k]={wk:d.wk||'',dist:(d.distrito||'').replace('CTA-TPI-INT-',''),tipo:d.tipoDistrito||'B',pen:d.penalizacion?'SI':'NO',b:0,n:0,sp:0,t100:0,tB:0,inas:0};
-    const w=wkD[k];w.n++;w.b+=d.bonoFinal||0;w.sp+=(d.pct||0);
+    if(!wkD[k])wkD[k]={wk:d.wk||'',dist:(d.distrito||'').replace('CTA-TPI-INT-',''),tipo:d.tipoDistrito||'B',pen:d.penalizacion?'SI':'NO',ids:new Set(),b:0,sp:0,t100:0,tB:0,inas:0};
+    const w=wkD[k];
+    if(w.ids.has(d.id))return;
+    w.ids.add(d.id);
+    w.b+=d.bonoFinal||0;w.sp+=(d.pct||0);
     if(d.pct>=100)w.t100++;else if(d.pct<80)w.tB++;
     if((d.inas||0)>0)w.inas++;
   });
   Object.values(wkD).sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')||(a.dist||'').localeCompare(b.dist||'')).forEach(w=>{
-    ctx+=`${_wkRange(w.wk)}|${w.dist}|${w.tipo}|${w.pen}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.tB}|${w.inas}\n`;
+    const n=w.ids.size;
+    ctx+=`${_wkRange(w.wk)}|${w.dist}|${w.tipo}|${w.pen}|${n}|${w.b}|${n?(w.sp/n).toFixed(1):0}%|${w.t100}|${w.tB}|${w.inas}\n`;
   });
 
   // 5. Detalle completo técnico × semana
