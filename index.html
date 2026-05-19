@@ -4583,6 +4583,14 @@ function _ctxTecnico(){
 }
 
 // ── Contexto completo (todo el historial, sin límite de semanas) ─────────────
+function _wkRange(wk){
+  if(!wk)return'';
+  const mon=new Date(wk+'T12:00:00');
+  if(isNaN(mon))return wk;
+  const sun=new Date(mon);sun.setDate(sun.getDate()+6);
+  return wk+'/'+sun.toISOString().slice(0,10);
+}
+
 function buildFullAIContext(){
   const data=window._allRealData;
   if(!data||!data.length)return'Sin datos cargados.';
@@ -4599,11 +4607,11 @@ function buildFullAIContext(){
   ctx+='Puntaje OS: Instalación=6 | Soporte=3 | Mant.Mayor=4 | Mant.=3 | Addons=2 | CambioDomicilio=6 | CambioEquipo=2 | SoporteEmp=5 | InstalEmp=8 | Recolección=1 | Factibilidad=1 | CambioPlan=2\n\n';
 
   // 2. Semanas
-  ctx+='SEMANAS EN DATOS ('+weeks.length+'): '+weeks.join(', ')+'\n\n';
+  ctx+='PERÍODOS EN DATOS ('+weeks.length+'): '+weeks.map(_wkRange).join(', ')+'\n\n';
 
   // 3. Resumen nacional por semana
   ctx+='═══ RESUMEN NACIONAL POR SEMANA ═══\n';
-  ctx+='semana|techs|bonos_total|avg%meta|100%+|90-99%|80-89%|<80%|con_inas|bono_prom\n';
+  ctx+='periodo(lun/dom)|techs|bonos_total|avg%meta|100%+|90-99%|80-89%|<80%|con_inas|bono_prom\n';
   const wkNac={};
   data.forEach(d=>{
     if(!wkNac[d.wk])wkNac[d.wk]={wk:d.wk,b:0,n:0,sp:0,t100:0,t90:0,t80:0,tB:0,inas:0};
@@ -4612,12 +4620,12 @@ function buildFullAIContext(){
     if((d.inas||0)>0)w.inas++;
   });
   Object.values(wkNac).sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')).forEach(w=>{
-    ctx+=`${w.wk}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.t90}|${w.t80}|${w.tB}|${w.inas}|${w.n?Math.round(w.b/w.n):0}\n`;
+    ctx+=`${_wkRange(w.wk)}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.t90}|${w.t80}|${w.tB}|${w.inas}|${w.n?Math.round(w.b/w.n):0}\n`;
   });
 
   // 4. Resumen por distrito × semana
   ctx+='\n═══ RESUMEN POR DISTRITO × SEMANA ═══\n';
-  ctx+='semana|distrito|tipo_dist|penaliz|techs|bonos_total|avg%meta|al100%|<80%|con_inas\n';
+  ctx+='periodo(lun/dom)|distrito|tipo_dist|penaliz|techs|bonos_total|avg%meta|al100%|<80%|con_inas\n';
   const wkD={};
   data.forEach(d=>{
     const k=(d.wk||'')+'||'+(d.distrito||'');
@@ -4627,14 +4635,14 @@ function buildFullAIContext(){
     if((d.inas||0)>0)w.inas++;
   });
   Object.values(wkD).sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')||(a.dist||'').localeCompare(b.dist||'')).forEach(w=>{
-    ctx+=`${w.wk}|${w.dist}|${w.tipo}|${w.pen}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.tB}|${w.inas}\n`;
+    ctx+=`${_wkRange(w.wk)}|${w.dist}|${w.tipo}|${w.pen}|${w.n}|${w.b}|${w.n?(w.sp/w.n).toFixed(1):0}%|${w.t100}|${w.tB}|${w.inas}\n`;
   });
 
   // 5. Detalle completo técnico × semana
   ctx+='\n═══ DETALLE TÉCNICO × SEMANA ═══\n';
-  ctx+='semana|técnico|coordinador|distrito|tipo_dist|skill|estrellas|meta|%meta|bono_base|bono_extra|bono_final|dias_trab|inasistencias\n';
+  ctx+='periodo(lun/dom)|técnico|coordinador|distrito|tipo_dist|skill|estrellas|meta|%meta|bono_base|bono_extra|bono_final|dias_trab|inasistencias\n';
   [...data].sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')||(a.nombre||'').localeCompare(b.nombre||'')).forEach(d=>{
-    ctx+=`${d.wk}|${d.nombre}|${d.coord||'-'}|${(d.distrito||'').replace('CTA-TPI-INT-','')}|${d.tipoDistrito||'B'}|${d.skill||'-'}|${d.estrellas||0}|${d.meta||0}|${(d.pct||0).toFixed(1)}%|${d.bonoBase||0}|${d.bonoExtra||0}|${d.bonoFinal||0}|${d.diasTrab||0}|${d.inas||0}\n`;
+    ctx+=`${_wkRange(d.wk)}|${d.nombre}|${d.coord||'-'}|${(d.distrito||'').replace('CTA-TPI-INT-','')}|${d.tipoDistrito||'B'}|${d.skill||'-'}|${d.estrellas||0}|${d.meta||0}|${(d.pct||0).toFixed(1)}%|${d.bonoBase||0}|${d.bonoExtra||0}|${d.bonoFinal||0}|${d.diasTrab||0}|${d.inas||0}\n`;
   });
 
   return ctx;
