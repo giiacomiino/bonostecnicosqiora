@@ -1030,7 +1030,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
         <textarea id="ai-context-editor" spellcheck="false"
           oninput="document.getElementById('ai-ctx-chars').textContent=this.value.length.toLocaleString('es-MX')+' caracteres'"
           style="width:100%;min-height:420px;font-family:'Courier New',monospace;font-size:11px;line-height:1.65;border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:#FAFAFA;color:var(--text);resize:vertical;box-sizing:border-box;outline:none"
-          placeholder="Carga datos primero (Excel o Supabase) para generar el contexto automáticamente."></textarea>
+          placeholder="Carga datos primero (Excel o Supabase) para generar el contexto automáticamente.&#10;&#10;Este contexto contiene los agregados nacionales y por distrito. El detalle individual por técnico se añade automáticamente según la vista activa al preguntar."></textarea>
       </div>
     </div><!-- /config -->
 
@@ -4648,12 +4648,9 @@ function buildFullAIContext(){
     ctx+=`${_wkRange(w.wk)}|${w.dist}|${w.tipo}|${w.pen}|${n}|${w.b}|${n?(w.sp/n).toFixed(1):0}%|${w.t100}|${w.tB}|${w.inas}\n`;
   });
 
-  // 5. Detalle completo técnico × semana
-  ctx+='\n═══ DETALLE TÉCNICO × SEMANA ═══\n';
-  ctx+='periodo(lun/dom)|técnico|coordinador|distrito|tipo_dist|skill|estrellas|meta|%meta|bono_base|bono_extra|bono_final|dias_trab|inasistencias\n';
-  [...data].sort((a,b)=>(a.wk||'').localeCompare(b.wk||'')||(a.nombre||'').localeCompare(b.nombre||'')).forEach(d=>{
-    ctx+=`${_wkRange(d.wk)}|${d.nombre}|${d.coord||'-'}|${(d.distrito||'').replace('CTA-TPI-INT-','')}|${d.tipoDistrito||'B'}|${d.skill||'-'}|${d.estrellas||0}|${d.meta||0}|${(d.pct||0).toFixed(1)}%|${d.bonoBase||0}|${d.bonoExtra||0}|${d.bonoFinal||0}|${d.diasTrab||0}|${d.inas||0}\n`;
-  });
+  // Nota: el detalle individual técnico×semana se incluye dinámicamente
+  // según la vista activa al momento de enviar la pregunta a Gemini.
+  ctx+='\n[El detalle por técnico se adjunta automáticamente según la vista activa]\n';
 
   return ctx;
 }
@@ -4815,7 +4812,10 @@ async function miniSendAI(view){
   try{
     const savedView=_currentView;_currentView=view;
     const ta=document.getElementById('ai-context-editor');
-    const dataCtx=(ta&&ta.value.trim())?ta.value.trim():buildAIContext();_currentView=savedView;
+    const baseCtx=ta&&ta.value.trim()?ta.value.trim():'';
+    const viewCtx=buildAIContext();
+    const dataCtx=baseCtx?`${baseCtx}\n\n═══ DETALLE VISTA ACTIVA ═══\n${viewCtx}`:viewCtx;
+    _currentView=savedView;
     const model=localStorage.getItem('qiora_gemini_model')||'gemini-2.5-flash';
     const fullText=`${AI_SYSTEM_PROMPT}\n\n---\n${dataCtx}\n\nPREGUNTA DEL USUARIO: ${question}`;
     const resp=await fetch(
@@ -4864,7 +4864,9 @@ async function sendAI(){
     addBubble('user',question);
     addBubble('thinking');
     const ta=document.getElementById('ai-context-editor');
-    const dataCtx=(ta&&ta.value.trim())?ta.value.trim():buildAIContext();
+    const baseCtx=ta&&ta.value.trim()?ta.value.trim():'';
+    const viewCtx=buildAIContext();
+    const dataCtx=baseCtx?`${baseCtx}\n\n═══ DETALLE VISTA ACTIVA ═══\n${viewCtx}`:viewCtx;
     const model=document.getElementById('ai-model-sel').value||'gemini-2.5-flash';
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),60000);
