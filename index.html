@@ -383,7 +383,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41"/></svg>
       Ajustes
     </div>
-    <div class="s-label">Inteligencia</div>
+    <div class="s-label" data-view-label="ai">Inteligencia</div>
     <div class="nav-i" data-view="ai" onclick="nav('ai',this)" style="background:linear-gradient(135deg,rgba(232,84,32,.12),rgba(232,84,32,.04));border:1px solid rgba(232,84,32,.2)">
       <svg viewBox="0 0 24 24" stroke-width="2" fill="none" stroke="currentColor"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
       QiORA AI
@@ -462,7 +462,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
         <option value="Elite">Elite</option>
         <option value="Multidistrito">Multidistrito</option>
       </select>
-      <button onclick="openExportModal()" title="Exportar datos con filtros activos" style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;border:1.5px solid #E5E7EB;background:white;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='var(--or)';this.style.color='var(--or)'" onmouseout="this.style.borderColor='#E5E7EB';this.style.color='var(--text2)'">
+      <button id="topbar-export-btn" onclick="openExportModal()" title="Exportar datos con filtros activos" style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;border:1.5px solid #E5E7EB;background:white;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap;transition:border-color .15s,color .15s" onmouseover="this.style.borderColor='var(--or)';this.style.color='var(--or)'" onmouseout="this.style.borderColor='#E5E7EB';this.style.color='var(--text2)'">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Exportar
       </button>
@@ -781,7 +781,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       </div>
 
       <div id="coord-detail-view" style="display:none">
-        <button class="back-btn" onclick="showCoordList()">
+        <button id="coord-back-btn" class="back-btn" onclick="showCoordList()">
           <svg viewBox="0 0 24 24" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Volver a Coordinadores
         </button>
@@ -911,7 +911,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       </div>
 
       <div id="tec-ficha-view" style="display:none">
-        <button class="back-btn" onclick="showTecList()">
+        <button id="tec-back-btn" class="back-btn" onclick="showTecList()">
           <svg viewBox="0 0 24 24" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           Volver a Técnicos
         </button>
@@ -1914,8 +1914,20 @@ function nav(id,el){
   document.getElementById('tb-title').textContent=t;
   document.getElementById('tb-badge').textContent=b;
   if(id==='distritos')renderDistList();
-  if(id==='coordinadores')renderCoordList();
-  if(id==='tecnicos')renderTecList();
+  if(id==='coordinadores'){
+    if(_currentUser&&_currentUser.rol==='coordinador'&&_currentUser.coord_nombre){
+      const coord=coordData.find(c=>c.nombre===_currentUser.coord_nombre||(c.coord||c.coordNombre)===_currentUser.coord_nombre);
+      if(coord){document.getElementById('coord-list-view').style.display='none';document.getElementById('coord-detail-view').style.display='';renderCoordDetail(coord);}
+      else renderCoordList();
+    } else renderCoordList();
+  }
+  if(id==='tecnicos'){
+    if(_currentUser&&_currentUser.rol==='tecnico'&&_currentUser.tecnico_nombre){
+      const t=getFiltered().find(x=>x.nombre===_currentUser.tecnico_nombre);
+      if(t){document.getElementById('tec-list-view').style.display='none';document.getElementById('tec-ficha-view').style.display='';renderFicha(t);}
+      else renderTecList();
+    } else renderTecList();
+  }
   if(id==='calculo')renderCalculo();
   if(id==='config')renderConfig();
   updateAIViewContext();
@@ -2673,7 +2685,11 @@ function renderCoordList(){
 
 function filterCoordList(q){coordSearch=q;renderCoordList();}
 function filterCoordDist(v){coordDist=v;renderCoordList();}
-function showCoordList(){document.getElementById('coord-list-view').style.display='';document.getElementById('coord-detail-view').style.display='none';}
+function showCoordList(){
+  if(_currentUser&&_currentUser.rol==='coordinador')return;
+  document.getElementById('coord-list-view').style.display='';
+  document.getElementById('coord-detail-view').style.display='none';
+}
 
 function openCoord(cid){
   selCoord=cid;
@@ -2990,7 +3006,11 @@ function filterTec(q){tecSearch=q.toLowerCase();applyTecFilters();}
 function filterTecDist(v){tecDist=v;applyTecFilters();}
 function filterTecSkill(v){tecSkill=v;applyTecFilters();}
 function filterTecLevel(v){tecLevel=v;applyTecFilters();}
-function showTecList(){document.getElementById('tec-list-view').style.display='';document.getElementById('tec-ficha-view').style.display='none';}
+function showTecList(){
+  if(_currentUser&&_currentUser.rol==='tecnico')return;
+  document.getElementById('tec-list-view').style.display='';
+  document.getElementById('tec-ficha-view').style.display='none';
+}
 
 function openTecFicha(tid){
   // Buscar en allData (semana actual) primero; si no está, buscar en _allRealData
@@ -4526,6 +4546,10 @@ async function doLogout(){
   showLoginScreen();
   // Reset nav y secciones admin
   document.querySelectorAll('.nav-i,.s-label[data-view-label]').forEach(el=>el.style.display='');
+  ['topbar-export-btn','coord-back-btn','tec-back-btn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display='';
+  });
   ['admin-delete-section','admin-excel-section'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='';
@@ -4538,6 +4562,13 @@ function applyRoleRestrictions(){
   // Mostrar todo primero
   document.querySelectorAll('.nav-i').forEach(el=>el.style.display='');
   document.querySelectorAll('.s-label[data-view-label]').forEach(el=>el.style.display='');
+  const exportBtn=document.getElementById('topbar-export-btn');
+  if(exportBtn)exportBtn.style.display='';
+  const coordBackBtn=document.getElementById('coord-back-btn');
+  const tecBackBtn=document.getElementById('tec-back-btn');
+  if(coordBackBtn)coordBackBtn.style.display='';
+  if(tecBackBtn)tecBackBtn.style.display='';
+
   // Herramientas destructivas: solo admin puede borrar o subir Excel
   const isAdmin=rol==='admin';
   ['admin-delete-section','admin-excel-section'].forEach(id=>{
@@ -4552,22 +4583,29 @@ function applyRoleRestrictions(){
     const configLabel=document.querySelector('.s-label[data-view-label="config"]');
     if(configLabel)configLabel.style.display='none';
   } else if(rol==='coordinador'){
-    // Hide Nacional, Distritos, Ajustes
-    ['nacional','distritos','config'].forEach(v=>{
+    // Hide Nacional, Distritos, Ajustes, QiORA AI + labels; hide export; lock back button
+    ['nacional','distritos','config','ai'].forEach(v=>{
       const el=document.querySelector(`.nav-i[data-view="${v}"]`);
       if(el)el.style.display='none';
     });
-    const configLabel=document.querySelector('.s-label[data-view-label="config"]');
-    if(configLabel)configLabel.style.display='none';
-    // Auto-navigate to coordinadores after data loads
+    ['config','ai'].forEach(label=>{
+      const el=document.querySelector(`.s-label[data-view-label="${label}"]`);
+      if(el)el.style.display='none';
+    });
+    if(exportBtn)exportBtn.style.display='none';
+    if(coordBackBtn)coordBackBtn.style.display='none';
   } else if(rol==='tecnico'){
-    // Hide Nacional, Distritos, Coordinadores, Cálculo, Ajustes, QiORA AI
+    // Hide Nacional, Distritos, Coordinadores, Cálculo, Ajustes, QiORA AI + labels; hide export; lock back button
     ['nacional','distritos','coordinadores','calculo','config','ai'].forEach(v=>{
       const el=document.querySelector(`.nav-i[data-view="${v}"]`);
       if(el)el.style.display='none';
     });
-    const configLabel=document.querySelector('.s-label[data-view-label="config"]');
-    if(configLabel)configLabel.style.display='none';
+    ['config','ai'].forEach(label=>{
+      const el=document.querySelector(`.s-label[data-view-label="${label}"]`);
+      if(el)el.style.display='none';
+    });
+    if(exportBtn)exportBtn.style.display='none';
+    if(tecBackBtn)tecBackBtn.style.display='none';
   }
 }
 
