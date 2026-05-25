@@ -1666,10 +1666,6 @@ const SERVICIOS=[['Instalación',6],['Soporte',3],['Mantenimiento Mayor',4],['Ma
 // Calcula puntos de una orden usando la tabla SERVICIOS actual (Ajustes)
 function svcPoints(tipo){
   const t=(tipo||'').toString().toLowerCase().trim();
-  // Hallazgo = mantenimiento detectado proactivamente (cuenta como Mantenimiento)
-  if(t==='hallazgo'||t.includes('hallazgo'))return 3;
-  // NA / N/A / No Aplica en contexto de mantenimiento = Mantenimiento
-  if(t==='na'||t==='n/a')return 3;
   for(const [s,p] of SERVICIOS){if(s.toLowerCase().trim()===t)return p;}
   for(const [s,p] of SERVICIOS){const sl=s.toLowerCase().trim();if(t.includes(sl)||sl.includes(t))return p;}
   return 0;
@@ -3370,12 +3366,17 @@ function renderFicha(t){
     }
   }catch(e){console.warn('chart-tec-os:',e);}
 
+  // Contar órdenes con tipo no-estándar (Hallazgo / NA) en la semana
+  const wkOrds=t.semOrders||[];
+  const hallazgos=wkOrds.filter(o=>{const ot=(o.originalTipo||o.tipo||'').toLowerCase();return ot==='hallazgo'||ot==='na'||ot==='n/a';});
+
   // Desglose
   document.getElementById('desglose-body').innerHTML=`
     <div class="des-row"><span class="des-key">Estrellas logradas</span><span class="des-val">⭐ ${t.estrellas}</span></div>
     <div class="des-row"><span class="des-key">Meta semanal</span><span class="des-val">⭐ ${t.meta}</span></div>
     <div class="des-row"><span class="des-key">Porcentaje de alcance</span><span class="des-val" style="color:${pctColor(t.pct)}">${fp(t.pct)}</span></div>
     <div class="des-row"><span class="des-key">Tipo de distrito</span><span class="des-val">Tipo ${t.tipo}</span></div>
+    ${hallazgos.length?`<div class="des-row"><span class="des-key" style="color:var(--or)">Hallazgos / NA en semana</span><span class="des-val" style="color:var(--or)">${hallazgos.length} orden${hallazgos.length!==1?'es':''} (ponderadas por Servicio)</span></div>`:''}
     <div class="des-row"><span class="des-key">Bono base (${fp(t.pct)} de meta)</span><span class="des-val">${t.bonoBase>0?f$(t.bonoBase):'$0 (no alcanzó 80%)'}</span></div>
     <div class="des-row"><span class="des-key">Bono 110%+ extra</span><span class="des-val" style="color:var(--green)">${t.bono110>0?'+'+f$(t.bono110):'—'}</span></div>
     <div class="des-row"><span class="des-key">Descuento por ${t.inas} día(s) sin trabajar ${t.descuento>0?'('+(t.inas===1?'50':'100')+'% del bono)':''}</span><span class="des-val" style="color:var(--red)">${t.descuento>0?'−'+f$(t.descuento):'—'}</span></div>
@@ -3757,7 +3758,12 @@ async function processWorkbook(wb,filename){
     const skill=normSkill(clean(row[C.skill]||''));
     const osNum =clean(row[C.os]||'');
     const otNum =clean(row[C.ot]||'');
-    const tipo  =clean(row[C.tipo]||row[C.servicio]||'Soporte');
+    const tipoRaw=clean(row[C.tipo]||'');
+    const tipoRawL=tipoRaw.toLowerCase();
+    // Si Tipo es no-estándar (Hallazgo, NA, N/A), usar columna Servicio para las estrellas
+    const NON_STD=tipoRawL==='hallazgo'||tipoRawL==='na'||tipoRawL==='n/a';
+    const tipo=NON_STD?(clean(row[C.servicio]||'')||tipoRaw||'Soporte'):(tipoRaw||clean(row[C.servicio]||'')||'Soporte');
+    const originalTipo=NON_STD?tipoRaw:'';
     const wk    =weekKey(fecha);
     const dia   =fecha.getFullYear()+'-'+String(fecha.getMonth()+1).padStart(2,'0')+'-'+String(fecha.getDate()).padStart(2,'0');
 
@@ -3771,7 +3777,7 @@ async function processWorkbook(wb,filename){
     // Dedup solo si hay número de OS o OT real — sin fallback por fecha/tipo
     const dedupKey=osNum||otNum;
     if(dedupKey){if(techMap[techKey]._seenOS.has(dedupKey))return;techMap[techKey]._seenOS.add(dedupKey);}
-    techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
+    techMap[techKey].orders.push({fecha,tipo,originalTipo,os:osNum,ot:otNum,wk,dia});
 
     if(!minDate||fecha<minDate)minDate=fecha;
     if(!maxDate||fecha>maxDate)maxDate=fecha;
@@ -3931,7 +3937,7 @@ function rebuildFromRawOrders(){
         const diff=Math.round((o.fecha-wkMon)/86400000);
         if(diff>=0&&diff<7){
           if(!ordersByDay[diff])ordersByDay[diff]=[];
-          ordersByDay[diff].push({os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,
+          ordersByDay[diff].push({os:o.os||'—',ot:o.ot||'—',tipo:o.tipo,originalTipo:o.originalTipo||'',
             estrellas:o.puntos,hora:o.fecha.toTimeString().slice(0,5),fecha:o.dia});
         }
       });
