@@ -3257,25 +3257,25 @@ function renderFicha(t){
   if(t.semana){
     // Marcar 'p' donde hay órdenes
     Object.keys(curOBD).forEach(di=>{calAsist[parseInt(di)]='p';});
-    // Por cada semana visible: si hay actividad, resolver descanso (1 día) vs falta
+    // Por cada semana visible: resolver descanso vs falta usando el inas REAL del registro calculado
+    // (garantiza consistencia 100% con el bono — no recomputa independientemente)
     for(let wk=0;wk<5;wk++){
       const wkMon=new Date(calBase);wkMon.setDate(wkMon.getDate()+wk*7);
       const wkStr=wkMon.getFullYear()+'-'+String(wkMon.getMonth()+1).padStart(2,'0')+'-'+String(wkMon.getDate()).padStart(2,'0');
-      // ¿Hay un registro para esta semana en _allRealData?
-      const hasActivity=window._allRealData
-        ?window._allRealData.some(r=>r.id===t.id&&r.semana===wkStr)
-        :t.semana===wkStr;
-      if(!hasActivity)continue; // semana sin datos → todo 'r' (ya es default)
+      // Buscar el registro calculado para esta semana
+      const wkRecord=window._allRealData
+        ?window._allRealData.find(r=>r.id===t.id&&r.semana===wkStr)
+        :(t.semana===wkStr?t:null);
+      if(!wkRecord)continue; // semana sin datos → todo 'r' (ya es default)
       const noOsDays=[];
       for(let d=0;d<7;d++){
         const di=wk*7+d;
         if(calAsist[di]!=='p')noOsDays.push(di);
       }
-      if(noOsDays.length===1){calAsist[noOsDays[0]]='r';}
-      else if(noOsDays.length>1){
-        noOsDays.slice(0,-1).forEach(di=>{calAsist[di]='a';});
-        calAsist[noOsDays[noOsDays.length-1]]='r';
-      }
+      if(noOsDays.length===0)continue;
+      // Usar el inas del registro real: exactamente inas días aparecen como 'a', el resto como 'r'
+      const wkInas=wkRecord.inas||0;
+      noOsDays.forEach((di,i)=>{calAsist[di]=i<wkInas?'a':'r';});
     }
   } else {
     const hmDataStart=window._hmStart?new Date(window._hmStart):new Date();
