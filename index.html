@@ -2638,7 +2638,10 @@ function renderCoordList(){
   if(sel.options.length===1){
     Object.keys(METAS).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=distShort(d);sel.appendChild(o);});
   }
+  // lider_distrital solo ve coordinadores de su distrito
+  const _rolDistrito=(_currentUser&&_currentUser.rol==='lider_distrital')?_currentUser.distrito:null;
   let filtered=coordData.filter(c=>{
+    if(_rolDistrito&&c.distrito!==_rolDistrito)return false;
     if(coordSearch&&!c.nombre.toLowerCase().includes(coordSearch.toLowerCase()))return false;
     if(coordDist&&c.distrito!==coordDist)return false;
     return true;
@@ -2677,8 +2680,9 @@ function renderCoordList(){
     </tr>`;
   }).join('');
 
-  // Gráfica de overview: top 15 coordinadores por bono total del equipo
-  const top15=coordData.map(c=>{
+  // Gráfica de overview: top 15 coordinadores por bono total del equipo (respeta filtro de distrito para lider_distrital)
+  const _coordBase=_rolDistrito?coordData.filter(c=>c.distrito===_rolDistrito):coordData;
+  const top15=_coordBase.map(c=>{
     const tBono=allData.filter(t=>t.coordId===c.id).reduce((s,t)=>s+t.bonoFinal,0);
     return{...c,tBono};
   }).sort((a,b)=>b.tBono-a.tBono).slice(0,15);
