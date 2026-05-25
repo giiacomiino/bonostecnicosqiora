@@ -1369,12 +1369,15 @@ async function loadFromSupabase(){
       if(!fecha||isNaN(fecha.getTime()))return;
       const dist=METAS[row.distrito]?row.distrito:(normDist(row.distrito)||Object.keys(METAS)[0]);
       const skill=normSkill(row.skill||'');
-      if(!techMap[techKey])techMap[techKey]={ffm:row.ffm||techKey,nombre:row.nombre||techKey,dist,skill,coord:'',orders:[]};
+      if(!techMap[techKey])techMap[techKey]={ffm:row.ffm||techKey,nombre:row.nombre||techKey,dist,skill,coord:'',orders:[],_seenOS:new Set()};
       if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
       if(row.coord&&!techMap[techKey].coord)techMap[techKey].coord=row.coord;
       const wk=row.semana||weekKey(fecha);
       const dia=row.dia||fecha.toISOString().slice(0,10);
-      techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:row.os_num||'',ot:row.ot_num||'',wk,dia});
+      const osId=row.os_num||'';const otId=row.ot_num||'';
+      const dedupKey=osId||otId; // solo dedup si hay ID real; sin fallback
+      if(dedupKey){if(techMap[techKey]._seenOS.has(dedupKey))return;techMap[techKey]._seenOS.add(dedupKey);}
+      techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:osId,ot:otId,wk,dia});
       if(!minDate||fecha<minDate)minDate=fecha;
       if(!maxDate||fecha>maxDate)maxDate=fecha;
     });
@@ -3757,10 +3760,13 @@ async function processWorkbook(wb,filename){
     const coordRaw=clean(C.coord>=0?row[C.coord]||'':'');
     const coordNom=coordRaw.startsWith('CTA-TPI-INT-')?coordRaw.replace('CTA-TPI-INT-',''):coordRaw;
 
-    if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[]};
+    if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[],_seenOS:new Set()};
     if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
     if(coordNom&&!techMap[techKey].coord)techMap[techKey].coord=coordNom;
 
+    // Dedup solo si hay número de OS o OT real — sin fallback por fecha/tipo
+    const dedupKey=osNum||otNum;
+    if(dedupKey){if(techMap[techKey]._seenOS.has(dedupKey))return;techMap[techKey]._seenOS.add(dedupKey);}
     techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
 
     if(!minDate||fecha<minDate)minDate=fecha;
