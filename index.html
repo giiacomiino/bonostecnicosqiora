@@ -4577,9 +4577,11 @@ function applyRoleRestrictions(){
   });
 
   if(rol==='lider_distrital'){
-    // Hide Ajustes nav item and its label
-    const configNav=document.querySelector('.nav-i[data-view="config"]');
-    if(configNav)configNav.style.display='none';
+    // Hide Nacional, Ajustes nav + label
+    ['nacional','config'].forEach(v=>{
+      const el=document.querySelector(`.nav-i[data-view="${v}"]`);
+      if(el)el.style.display='none';
+    });
     const configLabel=document.querySelector('.s-label[data-view-label="config"]');
     if(configLabel)configLabel.style.display='none';
   } else if(rol==='coordinador'){
@@ -4619,7 +4621,10 @@ function initApp(){
   loadFromSupabase().then(()=>{
     // Post-load navigation for restricted roles
     if(!_currentUser)return;
-    if(_currentUser.rol==='coordinador'&&_currentUser.coord_nombre){
+    if(_currentUser.rol==='lider_distrital'){
+      const navEl=document.querySelector('.nav-i[data-view="distritos"]');
+      nav('distritos',navEl||document.querySelector('.nav-i'));
+    } else if(_currentUser.rol==='coordinador'&&_currentUser.coord_nombre){
       const coord=coordData.find(c=>c.nombre===_currentUser.coord_nombre||(c.coord||c.coordNombre)===_currentUser.coord_nombre);
       if(coord){
         const navEl=document.querySelector('.nav-i[data-view="coordinadores"]');
