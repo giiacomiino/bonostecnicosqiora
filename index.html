@@ -405,7 +405,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
   </div>
 
   <!-- Supabase -->
-  <div id="admin-supabase-section" style="padding:14px 16px;border-top:1px solid var(--border)">
+  <div style="padding:14px 16px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:9px">
       <div id="sb-dot" style="width:7px;height:7px;border-radius:50%;background:#94A3B8;flex-shrink:0"></div>
       <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px">Supabase</span>
@@ -414,10 +414,12 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
       <svg width="13" height="13" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       Cargar desde Supabase
     </button>
-    <button onclick="deleteAllSupabase()" style="width:100%;background:white;color:var(--red);border:1.5px solid #FECACA;border-radius:8px;padding:7px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:6px">
-      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-      Borrar todos los datos
-    </button>
+    <div id="admin-delete-section">
+      <button onclick="deleteAllSupabase()" style="width:100%;background:white;color:var(--red);border:1.5px solid #FECACA;border-radius:8px;padding:7px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:6px">
+        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        Borrar todos los datos
+      </button>
+    </div>
     <div id="sb-status" style="font-size:10px;color:var(--text3);text-align:center;min-height:14px;line-height:1.4">Listo</div>
   </div>
 
@@ -1324,7 +1326,6 @@ function setSbStatus(msg,ok){
 }
 
 async function loadFromSupabase(){
-  if(_currentUser&&_currentUser.rol!=='admin'){setSbStatus('Sin permiso',false);return;}
   setSbStatus('Conectando…',null);
   // Mostrar estado vacío mientras carga
   allData=[];coordData=[];
@@ -4525,7 +4526,7 @@ async function doLogout(){
   showLoginScreen();
   // Reset nav y secciones admin
   document.querySelectorAll('.nav-i,.s-label[data-view-label]').forEach(el=>el.style.display='');
-  ['admin-supabase-section','admin-excel-section'].forEach(id=>{
+  ['admin-delete-section','admin-excel-section'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display='';
   });
@@ -4537,9 +4538,9 @@ function applyRoleRestrictions(){
   // Mostrar todo primero
   document.querySelectorAll('.nav-i').forEach(el=>el.style.display='');
   document.querySelectorAll('.s-label[data-view-label]').forEach(el=>el.style.display='');
-  // Herramientas de admin: solo visible para rol 'admin'
+  // Herramientas destructivas: solo admin puede borrar o subir Excel
   const isAdmin=rol==='admin';
-  ['admin-supabase-section','admin-excel-section'].forEach(id=>{
+  ['admin-delete-section','admin-excel-section'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.style.display=isAdmin?'':'none';
   });
