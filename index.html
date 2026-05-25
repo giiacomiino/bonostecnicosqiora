@@ -405,7 +405,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
   </div>
 
   <!-- Supabase -->
-  <div style="padding:14px 16px;border-top:1px solid var(--border)">
+  <div id="admin-supabase-section" style="padding:14px 16px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:9px">
       <div id="sb-dot" style="width:7px;height:7px;border-radius:50%;background:#94A3B8;flex-shrink:0"></div>
       <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px">Supabase</span>
@@ -421,7 +421,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     <div id="sb-status" style="font-size:10px;color:var(--text3);text-align:center;min-height:14px;line-height:1.4">Listo</div>
   </div>
 
-  <div class="s-export">
+  <div class="s-export" id="admin-excel-section">
     <input type="file" id="excel-input" accept=".xlsx,.xls" style="display:none" onchange="loadExcelFile(this)"/>
     <button class="btn-exp" onclick="document.getElementById('excel-input').click()">
       <svg width="14" height="14" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1324,6 +1324,7 @@ function setSbStatus(msg,ok){
 }
 
 async function loadFromSupabase(){
+  if(_currentUser&&_currentUser.rol!=='admin'){setSbStatus('Sin permiso',false);return;}
   setSbStatus('Conectando…',null);
   // Mostrar estado vacío mientras carga
   allData=[];coordData=[];
@@ -1536,6 +1537,7 @@ async function persistConfigToSupabase(){
 }
 
 async function deleteAllSupabase(){
+  if(_currentUser&&_currentUser.rol!=='admin'){alert('Solo el administrador puede borrar datos.');return;}
   if(!confirm('¿Seguro que quieres borrar TODOS los datos de Supabase? Esta acción no se puede deshacer.'))return;
   setSbStatus('Borrando…',null);
   try{
@@ -3623,6 +3625,7 @@ function formatWeekLabel(mondayDate){
 }
 
 function loadExcelFile(input){
+  if(_currentUser&&_currentUser.rol!=='admin'){alert('Solo el administrador puede subir archivos.');return;}
   const file=input.files[0];
   if(!file)return;
   document.getElementById('load-btn-label').textContent='Cargando…';
@@ -4520,18 +4523,26 @@ async function doLogout(){
   allData=[];
   coordData=[];
   showLoginScreen();
-  // Reset nav restrictions
-  document.querySelectorAll('.nav-i,.s-label[data-view-label]').forEach(el=>{
-    el.style.display='';
+  // Reset nav y secciones admin
+  document.querySelectorAll('.nav-i,.s-label[data-view-label]').forEach(el=>el.style.display='');
+  ['admin-supabase-section','admin-excel-section'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display='';
   });
 }
 
 function applyRoleRestrictions(){
   if(!_currentUser)return;
   const {rol}=_currentUser;
-  // First, show everything
+  // Mostrar todo primero
   document.querySelectorAll('.nav-i').forEach(el=>el.style.display='');
   document.querySelectorAll('.s-label[data-view-label]').forEach(el=>el.style.display='');
+  // Herramientas de admin: solo visible para rol 'admin'
+  const isAdmin=rol==='admin';
+  ['admin-supabase-section','admin-excel-section'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display=isAdmin?'':'none';
+  });
 
   if(rol==='lider_distrital'){
     // Hide Ajustes nav item and its label
