@@ -468,7 +468,7 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
         <svg viewBox="0 0 24 24" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
         <span class="notif-dot"></span>
       </div>
-      <div class="u-avatar">AU</div>
+      <div class="u-avatar" id="topbar-avatar">—</div>
     </div>
   </div>
 
@@ -4442,6 +4442,8 @@ function showUserInfoBar(user){
   const nombre=user.nombre||user.email||'';
   const initials=nombre.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';
   avatar.textContent=initials;
+  const topbarAvatar=document.getElementById('topbar-avatar');
+  if(topbarAvatar)topbarAvatar.textContent=initials;
   nameEl.textContent=nombre||user.email;
   rolEl.textContent=ROL_LABELS[user.rol]||user.rol||'—';
   bar.style.display='block';
