@@ -1916,9 +1916,14 @@ function nav(id,el){
   if(id==='distritos')renderDistList();
   if(id==='coordinadores'){
     if(_currentUser&&_currentUser.rol==='coordinador'&&_currentUser.coord_nombre){
-      const coord=coordData.find(c=>c.nombre===_currentUser.coord_nombre||(c.coord||c.coordNombre)===_currentUser.coord_nombre);
+      const coord=coordData.find(c=>
+        c.nombre===_currentUser.coord_nombre||
+        (c.coord||c.coordNombre)===_currentUser.coord_nombre||
+        (c.nombre||'').toLowerCase()===(_currentUser.coord_nombre||'').toLowerCase()
+      );
       if(coord){document.getElementById('coord-list-view').style.display='none';document.getElementById('coord-detail-view').style.display='';renderCoordDetail(coord);}
-      else renderCoordList();
+      // Si aún no hay datos cargados, dejar coord-list oculto y esperar
+      else {document.getElementById('coord-list-view').style.display='none';document.getElementById('coord-detail-view').style.display='none';}
     } else renderCoordList();
   }
   if(id==='tecnicos'){
@@ -2615,6 +2620,20 @@ function renderDistDetail(d){
 // COORDINADORES
 // ═══════════════════════════════════════════
 function renderCoordList(){
+  // Coordinador nunca ve la lista — siempre su propio detalle
+  if(_currentUser&&_currentUser.rol==='coordinador'){
+    const coord=coordData.find(c=>
+      c.nombre===_currentUser.coord_nombre||
+      (c.coord||c.coordNombre)===_currentUser.coord_nombre||
+      (c.nombre||'').toLowerCase()===(_currentUser.coord_nombre||'').toLowerCase()
+    );
+    if(coord){
+      document.getElementById('coord-list-view').style.display='none';
+      document.getElementById('coord-detail-view').style.display='';
+      renderCoordDetail(coord);
+    }
+    return;
+  }
   const sel=document.getElementById('coord-dist-filter');
   if(sel.options.length===1){
     Object.keys(METAS).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=distShort(d);sel.appendChild(o);});
@@ -4625,14 +4644,26 @@ function initApp(){
       const navEl=document.querySelector('.nav-i[data-view="distritos"]');
       nav('distritos',navEl||document.querySelector('.nav-i'));
     } else if(_currentUser.rol==='coordinador'&&_currentUser.coord_nombre){
-      const coord=coordData.find(c=>c.nombre===_currentUser.coord_nombre||(c.coord||c.coordNombre)===_currentUser.coord_nombre);
+      const coord=coordData.find(c=>
+        c.nombre===_currentUser.coord_nombre||
+        (c.coord||c.coordNombre)===_currentUser.coord_nombre||
+        (c.nombre||'').toLowerCase()===(_currentUser.coord_nombre||'').toLowerCase()
+      );
+      const navEl=document.querySelector('.nav-i[data-view="coordinadores"]');
+      // Activar vista coordinadores sin usar nav() para evitar renderCoordList()
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      document.querySelectorAll('.nav-i').forEach(n=>n.classList.remove('active'));
+      document.getElementById('view-coordinadores').classList.add('active');
+      if(navEl)navEl.classList.add('active');
+      document.getElementById('tb-title').textContent='Coordinadores Operativos';
+      document.getElementById('tb-badge').textContent='Desempeño por coordinador';
       if(coord){
-        const navEl=document.querySelector('.nav-i[data-view="coordinadores"]');
-        nav('coordinadores',navEl||null);
+        document.getElementById('coord-list-view').style.display='none';
+        document.getElementById('coord-detail-view').style.display='';
         renderCoordDetail(coord);
       } else {
-        const navEl=document.querySelector('.nav-i[data-view="coordinadores"]');
-        nav('coordinadores',navEl||null);
+        document.getElementById('coord-list-view').style.display='none';
+        document.getElementById('coord-detail-view').style.display='none';
       }
     } else if(_currentUser.rol==='tecnico'&&_currentUser.tecnico_nombre){
       const t=getFiltered().find(x=>x.nombre===_currentUser.tecnico_nombre);
