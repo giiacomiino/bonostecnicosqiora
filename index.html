@@ -258,6 +258,28 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
+
+/* LOGIN SCREEN */
+#login-screen{position:fixed;z-index:9999;inset:0;background:linear-gradient(135deg,#1a1a2e 0%,#0f0f1a 100%);display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif}
+.login-card{background:white;border-radius:20px;padding:40px 44px;width:min(420px,90vw);box-shadow:0 32px 80px rgba(0,0,0,.35)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.login-logo-icon{width:44px;height:44px;background:var(--or);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.login-logo-icon svg{width:24px;height:24px;fill:white}
+.login-brand{font-size:22px;font-weight:800;color:var(--or);line-height:1.1}
+.login-brand-sub{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-top:2px}
+.login-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px}
+.login-subtitle{font-size:13px;color:var(--text2);margin-bottom:28px;line-height:1.5}
+.login-field{margin-bottom:16px}
+.login-label{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:block}
+.login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:#F9F9FB;outline:none;transition:border-color .15s}
+.login-input:focus{border-color:var(--or);background:white}
+.login-btn{width:100%;background:var(--or);color:white;border:none;border-radius:10px;padding:13px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:background .15s}
+.login-btn:hover:not(:disabled){background:var(--or-dark)}
+.login-btn:disabled{opacity:.65;cursor:not-allowed}
+.login-error{color:var(--red);font-size:12px;font-weight:600;margin-top:10px;padding:10px 12px;background:var(--red-l);border-radius:8px;display:none}
+.login-spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 /* QiORA AI */
 #view-ai.active{display:flex!important;flex-direction:column}
 .ai-sug-card{background:white;border:1.5px solid #e5e7eb;border-radius:12px;padding:12px 14px;font-family:'Inter',sans-serif;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;text-align:left;display:flex;align-items:flex-start;gap:10px;line-height:1.5}
@@ -296,6 +318,35 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 </head>
 <body>
 
+<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="login-brand">QiORA</div>
+        <div class="login-brand-sub">Sistema de Bonos · TotalPlay</div>
+      </div>
+    </div>
+    <div class="login-title">Iniciar sesión</div>
+    <div class="login-subtitle">Accede con las credenciales asignadas por tu administrador.</div>
+    <div class="login-field">
+      <label class="login-label" for="login-email">Correo electrónico</label>
+      <input class="login-input" type="email" id="login-email" placeholder="usuario@qiora.com" autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('login-password').focus()"/>
+    </div>
+    <div class="login-field">
+      <label class="login-label" for="login-password">Contraseña</label>
+      <input class="login-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">
+      Entrar
+    </button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
 <!-- ═══════════ SIDEBAR ═══════════ -->
 <nav class="sidebar">
   <div class="s-logo">
@@ -309,35 +360,49 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
   </div>
 
   <div class="s-nav">
-    <div class="nav-i active" onclick="nav('nacional',this)">
+    <div class="nav-i active" data-view="nacional" onclick="nav('nacional',this)">
       <svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
       Vista Nacional
     </div>
-    <div class="nav-i" onclick="nav('distritos',this)">
+    <div class="nav-i" data-view="distritos" onclick="nav('distritos',this)">
       <svg viewBox="0 0 24 24" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
       Distritos <span class="nav-badge">17</span>
     </div>
-    <div class="nav-i" onclick="nav('coordinadores',this)">
+    <div class="nav-i" data-view="coordinadores" onclick="nav('coordinadores',this)">
       <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
       Coordinadores
     </div>
-    <div class="nav-i" onclick="nav('tecnicos',this)">
+    <div class="nav-i" data-view="tecnicos" onclick="nav('tecnicos',this)">
       <svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
       Técnicos
     </div>
-    <div class="nav-i" onclick="nav('calculo',this)">
+    <div class="nav-i" data-view="calculo" onclick="nav('calculo',this)">
       <svg viewBox="0 0 24 24" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
       Cálculo de Bonos
     </div>
-    <div class="s-label">Configuración</div>
-    <div class="nav-i" onclick="nav('config',this)">
+    <div class="s-label" data-view-label="config">Configuración</div>
+    <div class="nav-i" data-view="config" onclick="nav('config',this)">
       <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M12 2v2M12 20v2M20 12h2M2 12h2M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41"/></svg>
       Ajustes
     </div>
     <div class="s-label">Inteligencia</div>
-    <div class="nav-i" onclick="nav('ai',this)" style="background:linear-gradient(135deg,rgba(232,84,32,.12),rgba(232,84,32,.04));border:1px solid rgba(232,84,32,.2)">
+    <div class="nav-i" data-view="ai" onclick="nav('ai',this)" style="background:linear-gradient(135deg,rgba(232,84,32,.12),rgba(232,84,32,.04));border:1px solid rgba(232,84,32,.2)">
       <svg viewBox="0 0 24 24" stroke-width="2" fill="none" stroke="currentColor"><path d="M12 2L9 9H2l5.5 4.5L5 21l7-4.5L19 21l-2.5-7.5L22 9h-7z"/></svg>
       QiORA AI
+    </div>
+  </div>
+
+  <!-- User info bar -->
+  <div id="user-info-bar" style="padding:12px 16px;border-top:1px solid var(--border);display:none">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0" id="user-avatar">—</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="user-display-name">—</div>
+        <div style="font-size:10px;color:var(--text3)" id="user-display-rol">—</div>
+      </div>
+      <button onclick="doLogout()" title="Cerrar sesión" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:6px;display:flex;align-items:center" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text3)'">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
     </div>
   </div>
 
@@ -1618,7 +1683,16 @@ let allData=[], coordData=[], currentWeek=2;
 let selDistrito=null, selCoord=null, selTecnico=null;
 let globalSkill='';
 let _tierGroups=[], _inaGroups=[], _distInaGroups=[];
-function getFiltered(){return globalSkill?allData.filter(t=>t.skill===globalSkill):allData;}
+function getFiltered(){
+  let data=globalSkill?allData.filter(t=>t.skill===globalSkill):allData;
+  if(_currentUser){
+    const {rol,distrito,coord_nombre,tecnico_nombre}=_currentUser;
+    if(rol==='lider_distrital'&&distrito) data=data.filter(d=>d.distrito===distrito);
+    if(rol==='coordinador'&&coord_nombre) data=data.filter(d=>(d.coord||d.coordNombre)===coord_nombre);
+    if(rol==='tecnico'&&tecnico_nombre) data=data.filter(d=>d.nombre===tecnico_nombre);
+  }
+  return data;
+}
 function changeSkill(v){
   globalSkill=v;
   const active=document.querySelector('.view.active');
@@ -4337,15 +4411,201 @@ function doExport(){
 }
 
 // ═══════════════════════════════════════════
-// INIT — sin datos falsos; todo viene de Supabase
+// AUTH & ROLES
 // ═══════════════════════════════════════════
-allData=[];
-coordData=[];
-renderNacional();
-renderConfig();
-// Iniciar carga de config antes que los datos — garantiza METAS idénticos en ambas rutas
-_configReady = loadConfig();
-loadFromSupabase();
+let _currentUser = null;
+
+const ROL_LABELS = {
+  admin: 'Administrador',
+  director: 'Director',
+  finanzas: 'Finanzas',
+  lider_distrital: 'Líder Distrital',
+  coordinador: 'Coordinador',
+  tecnico: 'Técnico'
+};
+
+function showLoginScreen(){
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-error').style.display='none';
+  document.getElementById('login-error').textContent='';
+  document.getElementById('login-btn').disabled=false;
+  document.getElementById('login-btn').innerHTML='Entrar';
+}
+
+function hideLoginScreen(){
+  document.getElementById('login-screen').style.display='none';
+}
+
+function showUserInfoBar(user){
+  const bar=document.getElementById('user-info-bar');
+  const avatar=document.getElementById('user-avatar');
+  const nameEl=document.getElementById('user-display-name');
+  const rolEl=document.getElementById('user-display-rol');
+  const nombre=user.nombre||user.email||'';
+  const initials=nombre.trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';
+  avatar.textContent=initials;
+  nameEl.textContent=nombre||user.email;
+  rolEl.textContent=ROL_LABELS[user.rol]||user.rol||'—';
+  bar.style.display='block';
+}
+
+function hideUserInfoBar(){
+  document.getElementById('user-info-bar').style.display='none';
+}
+
+async function fetchUserProfile(authUser){
+  const {data,error}=await _sb.from('usuarios').select('*').eq('id',authUser.id).single();
+  if(error||!data){
+    await _sb.auth.signOut();
+    showLoginScreen();
+    const errEl=document.getElementById('login-error');
+    errEl.textContent='Tu usuario no tiene perfil configurado. Contacta al administrador.';
+    errEl.style.display='block';
+    return;
+  }
+  _currentUser={
+    id:data.id,
+    email:data.email||authUser.email,
+    nombre:data.nombre||data.name||'',
+    rol:data.rol||'tecnico',
+    distrito:data.distrito||null,
+    coord_nombre:data.coord_nombre||null,
+    tecnico_nombre:data.tecnico_nombre||null
+  };
+  hideLoginScreen();
+  showUserInfoBar(_currentUser);
+  initApp();
+}
+
+async function checkAuth(){
+  const {data:{session}}=await _sb.auth.getSession();
+  if(session){
+    await fetchUserProfile(session.user);
+  } else {
+    showLoginScreen();
+  }
+}
+
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const errEl=document.getElementById('login-error');
+  const btn=document.getElementById('login-btn');
+  errEl.style.display='none';
+  errEl.textContent='';
+  if(!email||!password){
+    errEl.textContent='Ingresa tu correo y contraseña.';
+    errEl.style.display='block';
+    return;
+  }
+  btn.disabled=true;
+  btn.innerHTML='<div class="login-spinner"></div>';
+  const {data,error}=await _sb.auth.signInWithPassword({email,password});
+  if(error){
+    btn.disabled=false;
+    btn.innerHTML='Entrar';
+    errEl.textContent=error.message==='Invalid login credentials'
+      ?'Credenciales incorrectas. Verifica tu correo y contraseña.'
+      :error.message;
+    errEl.style.display='block';
+    return;
+  }
+  await fetchUserProfile(data.user);
+}
+
+async function doLogout(){
+  await _sb.auth.signOut();
+  _currentUser=null;
+  hideUserInfoBar();
+  allData=[];
+  coordData=[];
+  showLoginScreen();
+  // Reset nav restrictions
+  document.querySelectorAll('.nav-i,.s-label[data-view-label]').forEach(el=>{
+    el.style.display='';
+  });
+}
+
+function applyRoleRestrictions(){
+  if(!_currentUser)return;
+  const {rol}=_currentUser;
+  // First, show everything
+  document.querySelectorAll('.nav-i').forEach(el=>el.style.display='');
+  document.querySelectorAll('.s-label[data-view-label]').forEach(el=>el.style.display='');
+
+  if(rol==='lider_distrital'){
+    // Hide Ajustes nav item and its label
+    const configNav=document.querySelector('.nav-i[data-view="config"]');
+    if(configNav)configNav.style.display='none';
+    const configLabel=document.querySelector('.s-label[data-view-label="config"]');
+    if(configLabel)configLabel.style.display='none';
+  } else if(rol==='coordinador'){
+    // Hide Nacional, Distritos, Ajustes
+    ['nacional','distritos','config'].forEach(v=>{
+      const el=document.querySelector(`.nav-i[data-view="${v}"]`);
+      if(el)el.style.display='none';
+    });
+    const configLabel=document.querySelector('.s-label[data-view-label="config"]');
+    if(configLabel)configLabel.style.display='none';
+    // Auto-navigate to coordinadores after data loads
+  } else if(rol==='tecnico'){
+    // Hide Nacional, Distritos, Coordinadores, Cálculo, Ajustes, QiORA AI
+    ['nacional','distritos','coordinadores','calculo','config','ai'].forEach(v=>{
+      const el=document.querySelector(`.nav-i[data-view="${v}"]`);
+      if(el)el.style.display='none';
+    });
+    const configLabel=document.querySelector('.s-label[data-view-label="config"]');
+    if(configLabel)configLabel.style.display='none';
+  }
+}
+
+function initApp(){
+  applyRoleRestrictions();
+  allData=[];
+  coordData=[];
+  renderNacional();
+  renderConfig();
+  _configReady=loadConfig();
+  loadFromSupabase().then(()=>{
+    // Post-load navigation for restricted roles
+    if(!_currentUser)return;
+    if(_currentUser.rol==='coordinador'&&_currentUser.coord_nombre){
+      const coord=coordData.find(c=>c.nombre===_currentUser.coord_nombre||(c.coord||c.coordNombre)===_currentUser.coord_nombre);
+      if(coord){
+        const navEl=document.querySelector('.nav-i[data-view="coordinadores"]');
+        nav('coordinadores',navEl||null);
+        renderCoordDetail(coord);
+      } else {
+        const navEl=document.querySelector('.nav-i[data-view="coordinadores"]');
+        nav('coordinadores',navEl||null);
+      }
+    } else if(_currentUser.rol==='tecnico'&&_currentUser.tecnico_nombre){
+      const t=getFiltered().find(x=>x.nombre===_currentUser.tecnico_nombre);
+      if(t){
+        const navEl=document.querySelector('.nav-i[data-view="tecnicos"]');
+        nav('tecnicos',navEl||null);
+        renderFicha(t);
+      } else {
+        const navEl=document.querySelector('.nav-i[data-view="tecnicos"]');
+        nav('tecnicos',navEl||null);
+      }
+    }
+  }).catch(()=>{});
+}
+
+// Auth state change handler (token refresh / sign-out events)
+_sb.auth.onAuthStateChange((event,session)=>{
+  if(event==='SIGNED_OUT'&&_currentUser){
+    _currentUser=null;
+    hideUserInfoBar();
+    allData=[];
+    coordData=[];
+    showLoginScreen();
+    document.querySelectorAll('.nav-i,.s-label[data-view-label]').forEach(el=>{
+      el.style.display='';
+    });
+  }
+});
 
 // ═══════════════════════════════════════════
 // QIORA AI — Gemini Integration
@@ -4703,6 +4963,9 @@ const AI_SUGGESTIONS={
 
 // Inicializar AI después de que AI_SUGGESTIONS esté disponible
 initAI();
+
+// Verificar autenticación al cargar la página
+checkAuth();
 
 function updateAIViewContext(){
   if(typeof AI_SUGGESTIONS==='undefined'||!AI_SUGGESTIONS)return;
