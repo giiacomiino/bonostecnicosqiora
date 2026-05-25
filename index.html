@@ -1369,15 +1369,11 @@ async function loadFromSupabase(){
       if(!fecha||isNaN(fecha.getTime()))return;
       const dist=METAS[row.distrito]?row.distrito:(normDist(row.distrito)||Object.keys(METAS)[0]);
       const skill=normSkill(row.skill||'');
-      if(!techMap[techKey])techMap[techKey]={ffm:row.ffm||techKey,nombre:row.nombre||techKey,dist,skill,coord:'',orders:[],_seenOS:new Set()};
+      if(!techMap[techKey])techMap[techKey]={ffm:row.ffm||techKey,nombre:row.nombre||techKey,dist,skill,coord:'',orders:[]};
       if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
       if(row.coord&&!techMap[techKey].coord)techMap[techKey].coord=row.coord;
       const wk=row.semana||weekKey(fecha);
       const dia=row.dia||fecha.toISOString().slice(0,10);
-      // Deduplicar por OS/OT — puede haber duplicados en Supabase si el Excel de origen los tenía
-      const dedupKey=row.os_num||row.ot_num||`${dia}_${row.tipo||''}`;
-      if(dedupKey&&techMap[techKey]._seenOS.has(dedupKey))return;
-      if(dedupKey)techMap[techKey]._seenOS.add(dedupKey);
       techMap[techKey].orders.push({fecha,tipo:row.tipo||'Soporte',os:row.os_num||'',ot:row.ot_num||'',wk,dia});
       if(!minDate||fecha<minDate)minDate=fecha;
       if(!maxDate||fecha>maxDate)maxDate=fecha;
@@ -3257,25 +3253,25 @@ function renderFicha(t){
   if(t.semana){
     // Marcar 'p' donde hay órdenes
     Object.keys(curOBD).forEach(di=>{calAsist[parseInt(di)]='p';});
-    // Por cada semana visible: resolver descanso vs falta usando el inas REAL del registro calculado
-    // (garantiza consistencia 100% con el bono — no recomputa independientemente)
+    // Por cada semana visible: si hay actividad, resolver descanso (1 día) vs falta
     for(let wk=0;wk<5;wk++){
       const wkMon=new Date(calBase);wkMon.setDate(wkMon.getDate()+wk*7);
       const wkStr=wkMon.getFullYear()+'-'+String(wkMon.getMonth()+1).padStart(2,'0')+'-'+String(wkMon.getDate()).padStart(2,'0');
-      // Buscar el registro calculado para esta semana
-      const wkRecord=window._allRealData
-        ?window._allRealData.find(r=>r.id===t.id&&r.semana===wkStr)
-        :(t.semana===wkStr?t:null);
-      if(!wkRecord)continue; // semana sin datos → todo 'r' (ya es default)
+      // ¿Hay un registro para esta semana en _allRealData?
+      const hasActivity=window._allRealData
+        ?window._allRealData.some(r=>r.id===t.id&&r.semana===wkStr)
+        :t.semana===wkStr;
+      if(!hasActivity)continue; // semana sin datos → todo 'r' (ya es default)
       const noOsDays=[];
       for(let d=0;d<7;d++){
         const di=wk*7+d;
         if(calAsist[di]!=='p')noOsDays.push(di);
       }
-      if(noOsDays.length===0)continue;
-      // Usar el inas del registro real: exactamente inas días aparecen como 'a', el resto como 'r'
-      const wkInas=wkRecord.inas||0;
-      noOsDays.forEach((di,i)=>{calAsist[di]=i<wkInas?'a':'r';});
+      if(noOsDays.length===1){calAsist[noOsDays[0]]='r';}
+      else if(noOsDays.length>1){
+        noOsDays.slice(0,-1).forEach(di=>{calAsist[di]='a';});
+        calAsist[noOsDays[noOsDays.length-1]]='r';
+      }
     }
   } else {
     const hmDataStart=window._hmStart?new Date(window._hmStart):new Date();
@@ -3368,14 +3364,6 @@ function renderFicha(t){
   }catch(e){console.warn('chart-tec-os:',e);}
 
   // Desglose
-  const wkOrders=(t.semOrders||[]).slice().sort((a,b)=>(a.dia||'').localeCompare(b.dia||'')||(a.hora||'').localeCompare(b.hora||''));
-  const auditoriaRows=wkOrders.map(o=>`
-    <tr style="border-bottom:1px solid #F5F5F8">
-      <td style="padding:4px 8px;font-size:11px;color:var(--text2)">${o.dia||'—'}</td>
-      <td style="padding:4px 8px;font-size:11px;font-family:monospace;color:var(--text2)">${o.os||'—'}</td>
-      <td style="padding:4px 8px;font-size:11px;color:var(--text2)">${o.tipo||'—'}</td>
-      <td style="padding:4px 8px;font-size:11px;font-weight:700;text-align:right;color:var(--or)">⭐ ${o.puntos??svcPoints(o.tipo)}</td>
-    </tr>`).join('');
   document.getElementById('desglose-body').innerHTML=`
     <div class="des-row"><span class="des-key">Estrellas logradas</span><span class="des-val">⭐ ${t.estrellas}</span></div>
     <div class="des-row"><span class="des-key">Meta semanal</span><span class="des-val">⭐ ${t.meta}</span></div>
@@ -3384,25 +3372,7 @@ function renderFicha(t){
     <div class="des-row"><span class="des-key">Bono base (${fp(t.pct)} de meta)</span><span class="des-val">${t.bonoBase>0?f$(t.bonoBase):'$0 (no alcanzó 80%)'}</span></div>
     <div class="des-row"><span class="des-key">Bono 110%+ extra</span><span class="des-val" style="color:var(--green)">${t.bono110>0?'+'+f$(t.bono110):'—'}</span></div>
     <div class="des-row"><span class="des-key">Descuento por ${t.inas} día(s) sin trabajar ${t.descuento>0?'('+(t.inas===1?'50':'100')+'% del bono)':''}</span><span class="des-val" style="color:var(--red)">${t.descuento>0?'−'+f$(t.descuento):'—'}</span></div>
-    <div class="des-row des-total"><span class="des-key">Bono Neto Final</span><span class="des-val">${f$(t.bonoFinal)}</span></div>
-    ${wkOrders.length?`
-    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px">
-        Detalle OS semana — ${wkOrders.length} órdenes · ⭐ ${wkOrders.reduce((s,o)=>s+(o.puntos??svcPoints(o.tipo)),0)} total
-      </div>
-      <div style="overflow-x:auto;max-height:260px;overflow-y:auto">
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr style="background:#F9FAFB">
-            <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:left;border-bottom:1px solid var(--border)">Fecha</th>
-            <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:left;border-bottom:1px solid var(--border)">OS</th>
-            <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:left;border-bottom:1px solid var(--border)">Tipo</th>
-            <th style="padding:4px 8px;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:right;border-bottom:1px solid var(--border)">⭐</th>
-          </tr></thead>
-          <tbody>${auditoriaRows}</tbody>
-        </table>
-      </div>
-    </div>`:''}
-  `;
+    <div class="des-row des-total"><span class="des-key">Bono Neto Final</span><span class="des-val">${f$(t.bonoFinal)}</span></div>`;
 }
 
 // ═══════════════════════════════════════════
@@ -3787,14 +3757,10 @@ async function processWorkbook(wb,filename){
     const coordRaw=clean(C.coord>=0?row[C.coord]||'':'');
     const coordNom=coordRaw.startsWith('CTA-TPI-INT-')?coordRaw.replace('CTA-TPI-INT-',''):coordRaw;
 
-    if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[],_seenOS:new Set()};
+    if(!techMap[techKey])techMap[techKey]={ffm:techKey,nombre:nombre||techKey,dist,skill,coord:'',orders:[]};
     if(dist!==Object.keys(METAS)[0]&&METAS[dist])techMap[techKey].dist=dist;
     if(coordNom&&!techMap[techKey].coord)techMap[techKey].coord=coordNom;
 
-    // Deduplicar por número de OS (primario) o OT (fallback) — Field Cloud puede entregar la misma OS varias veces
-    const dedupKey=osNum||otNum||`${dia}_${tipo}`;
-    if(dedupKey&&techMap[techKey]._seenOS.has(dedupKey))return; // duplicado, ignorar
-    if(dedupKey)techMap[techKey]._seenOS.add(dedupKey);
     techMap[techKey].orders.push({fecha,tipo,os:osNum,ot:otNum,wk,dia});
 
     if(!minDate||fecha<minDate)minDate=fecha;
