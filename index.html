@@ -1666,6 +1666,10 @@ const SERVICIOS=[['Instalación',6],['Soporte',3],['Mantenimiento Mayor',4],['Ma
 // Calcula puntos de una orden usando la tabla SERVICIOS actual (Ajustes)
 function svcPoints(tipo){
   const t=(tipo||'').toString().toLowerCase().trim();
+  // Hallazgo = mantenimiento detectado proactivamente (cuenta como Mantenimiento)
+  if(t==='hallazgo'||t.includes('hallazgo'))return 3;
+  // NA / N/A / No Aplica en contexto de mantenimiento = Mantenimiento
+  if(t==='na'||t==='n/a')return 3;
   for(const [s,p] of SERVICIOS){if(s.toLowerCase().trim()===t)return p;}
   for(const [s,p] of SERVICIOS){const sl=s.toLowerCase().trim();if(t.includes(sl)||sl.includes(t))return p;}
   return 0;
