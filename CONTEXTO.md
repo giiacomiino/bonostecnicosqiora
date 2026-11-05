@@ -219,3 +219,36 @@ App web de una sola página (SPA). Sin framework — HTML/CSS/JS puro.
 | Híbrido | Técnico que mezcla instalaciones y mantenimientos |
 | Hallazgo | OS detectada proactivamente por el técnico (cuenta como mantenimiento) |
 | ERP | Sistema interno de QiORA (fuente de verdad en producción) |
+
+---
+
+## Esquema OS (folios) + Snowflake — desde nov-2026
+
+> El esquema de **estrellas ya no se usa**. Desde el 26-oct-2026 el bono se calcula con **folios** (OS completadas). Fuente de verdad de reglas: `Archivo de cálculo esquema OS v13.xlsx` (hoja *Supuestos*), copiada en `config/esquema_os.json`.
+
+**Flujo:** Snowflake (solo lectura) → `snowflake/generar_bonos.py` → `datos_salida/bonos_os.json` → `visualizador.html`.
+
+- **Fuente:** `CONECTA.INSTALACIONES.CIERRE_FC`, `EMPRESA_PROVEEDOR in ('MEGON 3','MEGON')`, warehouse `CARGA_WH`, conexión `a6059471880971-qiora` (OAuth). Nunca se escribe en Snowflake.
+- **Catálogo** (`catalogos/tecnicos.csv`, exportado de la hoja *Tecnicos* del v13): sucursal, coordinador, cuadrilla y póliza por técnico. Snowflake trae el distrito de la *orden*, no del técnico.
+- **Dedup:** un OT cuenta una vez por técnico. **Fecha:** `FECHA_TERMINO`. **Semana:** lunes a domingo.
+- **Validado contra el v13:** semanas 28-sep y 5-oct idénticas en folios y bono; demás semanas ±1 folio en ~3 técnicos.
+- **Datos sensibles:** el repo es público → `catalogos/` y `datos_salida/` están en `.gitignore`. El visualizador no trae datos incrustados.
+
+### Reglas implementadas
+| Regla | Implementación |
+|---|---|
+| Tier | Folios ponderados (empresariales × 1.5) vs Meta Base / Medio / Alto de la sucursal; < Base = $0 |
+| Empresariales | `TIPO` Empresarial (Instalación Empresarial) y Hallazgo Empresarial (Soporte Empresarial). Recolección Empresarial = 1x |
+| Adicionales | $100 × (folios reales − Meta Alta original), sin tope |
+| Mín. mantenimiento | Solo GDL Barranca/Estadio/López Mateos/Primavera: ≥16 mant. (Mayor+Menor) → Meta Alta del tier topada en 24 (decisión pendiente de confirmar; el v13 no la aplica en *Detalle*) |
+| Descuento | 5 días = 50%, ≤4 días = 100% sobre (tier + adicionales); día trabajado = ≥1 orden |
+| Pólizas sin bono | Recolecciones (Moto PI fuera de esta versión) |
+| Vigencia | Bono desde la semana del 26-oct-2026; antes solo asistencia/productividad |
+
+### Uso
+```bash
+./visualizar.sh --actualizar   # lee Snowflake, regenera y abre http://localhost:8765/visualizador.html
+./visualizar.sh                # abre con el último JSON generado
+.venv/bin/python snowflake/generar_bonos.py --offline   # recalcula con el caché local (sin Snowflake)
+```
+`index.html` (dashboard con login Supabase) **todavía usa el esquema de estrellas**; falta migrarlo a este JSON.

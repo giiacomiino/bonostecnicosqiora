@@ -5,3 +5,5 @@ Bonos BI/
 *.xlsx
 __pycache__/
 *.pyc
+.venv/
+catalogos/

@@ -1,0 +1,52 @@
+{
+  "_fuente": "Archivo de cálculo esquema OS v13.xlsx — hoja Supuestos",
+  "vigente_desde": "2026-10-26",
+  "factor_empresarial": 1.5,
+  "os_adicional": 100,
+  "meta_alta_con_min_mantenimiento": 24,
+  "descuento_inasistencia": [
+    {"dias_max": 4, "pct": 1.0},
+    {"dias_max": 5, "pct": 0.5}
+  ],
+  "polizas_sin_bono": ["Recolecciones"],
+  "sucursales": {
+    "CTA-TPI-INT-IRA IRAPUATO":         {"nombre": "Irapuato",          "tipo": "B", "metas": [19, 21, 23], "bonos": [600, 1500, 2100], "min_mant": 0},
+    "CTA-TPI-INT-COL COLIMA":           {"nombre": "Colima",            "tipo": "B", "metas": [19, 21, 23], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-GBA GDL BARRANCA":     {"nombre": "GDL Barranca",      "tipo": "A", "metas": [21, 23, 26], "bonos": [500, 1000, 2500], "min_mant": 16},
+    "CTA-TPI-INT-GES GDL ESTADIO":      {"nombre": "GDL Estadio",       "tipo": "A", "metas": [21, 23, 25], "bonos": [500, 1000, 2500], "min_mant": 16},
+    "CTA-TPI-INT-GLM GDL LOPEZ MATEOS": {"nombre": "GDL López Mateos",  "tipo": "A", "metas": [20, 22, 24], "bonos": [500, 1000, 2500], "min_mant": 16},
+    "CTA-TPI-INT-GPR GDL PRIMAVERA":    {"nombre": "GDL Primavera",     "tipo": "A", "metas": [21, 23, 25], "bonos": [500, 1000, 2500], "min_mant": 16},
+    "CTA-TPI-INT-MOR MORELIA":          {"nombre": "Morelia",           "tipo": "B", "metas": [19, 21, 23], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-TEP TEPIC":            {"nombre": "Tepic",             "tipo": "B", "metas": [19, 21, 23], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-CUN CANCUN 1":         {"nombre": "Cancún",            "tipo": "B", "metas": [20, 22, 24], "bonos": [600, 1800, 2000], "min_mant": 0},
+    "CTA-TPI-INT-CBA CORDOBA ORIZABA":  {"nombre": "Córdoba-Orizaba",   "tipo": "B", "metas": [20, 22, 24], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-PUE PUEBLA":           {"nombre": "Puebla",            "tipo": "B", "metas": [20, 22, 24], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-VRZ VERACRUZ":         {"nombre": "Veracruz",          "tipo": "B", "metas": [20, 22, 24], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-XAL XALAPA":           {"nombre": "Xalapa",            "tipo": "B", "metas": [20, 22, 24], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-AGS AGUASCALIENTES":   {"nombre": "Aguascalientes",    "tipo": "B", "metas": [20, 22, 24], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-INT-LON LEON":             {"nombre": "León",              "tipo": "B", "metas": [20, 22, 24], "bonos": [800, 1500, 2100], "min_mant": 0},
+    "CTA-TPI-INT-TUX TUXTLA":           {"nombre": "Tuxtla",            "tipo": "B", "metas": [20, 22, 24], "bonos": [700, 1400, 2200], "min_mant": 0},
+    "CTA-TPI-INT-MER MERIDA":           {"nombre": "Mérida",            "tipo": "B", "metas": [20, 22, 24], "bonos": [900, 1400, 2000], "min_mant": 0},
+    "CTA-TPI-MLT-GDL MLT GUADALAJARA":  {"nombre": "GDL Multidistrito", "tipo": "A", "metas": [20, 22, 24], "bonos": [900, 1400, 2000], "min_mant": 0}
+  },
+  "distrito_origen_a_sucursal": {
+    "AGUASCALIENTES": "CTA-TPI-INT-AGS AGUASCALIENTES",
+    "CANCUN": "CTA-TPI-INT-CUN CANCUN 1",
+    "COLIMA / MANZANILLO": "CTA-TPI-INT-COL COLIMA",
+    "CORDOBA / ORIZABA": "CTA-TPI-INT-CBA CORDOBA ORIZABA",
+    "GDL BARRANCA": "CTA-TPI-INT-GBA GDL BARRANCA",
+    "GDL ESTADIO": "CTA-TPI-INT-GES GDL ESTADIO",
+    "GDL LA PRIMAVERA": "CTA-TPI-INT-GPR GDL PRIMAVERA",
+    "GDL LOPEZ MATEOS": "CTA-TPI-INT-GLM GDL LOPEZ MATEOS",
+    "IRAPUATO": "CTA-TPI-INT-IRA IRAPUATO",
+    "LEON": "CTA-TPI-INT-LON LEON",
+    "MERIDA": "CTA-TPI-INT-MER MERIDA",
+    "MORELIA": "CTA-TPI-INT-MOR MORELIA",
+    "PUE ANGELOPOLIS": "CTA-TPI-INT-PUE PUEBLA",
+    "PUE LA NORIA": "CTA-TPI-INT-PUE PUEBLA",
+    "TEPIC": "CTA-TPI-INT-TEP TEPIC",
+    "TUXTLA": "CTA-TPI-INT-TUX TUXTLA",
+    "VERACRUZ": "CTA-TPI-INT-VRZ VERACRUZ",
+    "XALAPA": "CTA-TPI-INT-XAL XALAPA"
+  }
+}
