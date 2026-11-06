@@ -2,187 +2,371 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Asistencia y Productividad · QiORA</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>QiORA | Asistencia y Productividad</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  color-scheme:light;
-  --or:#E85420;--or-dark:#C94315;--or-light:#FEF0EB;
-  --bg:#F4F5F7;--card:#FFFFFF;--card2:#F9FAFB;--text:#111827;--text2:#4B5563;--text3:#9CA3AF;
-  --border:#E5E7EB;--grid:#EEF0F3;
-  --seq-0:#eef4fc;--seq-1:#cde2fb;--seq-2:#9ec5f4;--seq-3:#6da7ec;--seq-4:#3987e5;--seq-5:#256abf;--seq-6:#184f95;--seq-7:#0d366b;
-  --st-good:#2a78d6;--st-good2:#86b6ef;--st-warn:#fab219;--st-serious:#ec835a;--st-crit:#d03b3b;--st-none:#E5E7EB;
-  --r:12px;--sh:0 1px 4px rgba(0,0,0,.06);
+  --or:#E85420;--or-dark:#C94315;--or-light:#FEF0EB;--or-border:#FDDDD3;
+  --bg:#F4F5F7;--card:#FFFFFF;--text:#111827;--text2:#6B7280;--text3:#9CA3AF;
+  --border:#E5E7EB;--green:#16A34A;--green-l:#DCFCE7;--red:#DC2626;--red-l:#FEE2E2;
+  --yellow:#D97706;--yellow-l:#FEF3C7;--blue:#2563EB;--blue-l:#DBEAFE;
+  --r:12px;--sh:0 1px 4px rgba(0,0,0,.06);--sh2:0 4px 16px rgba(0,0,0,.09);
+  --sw:220px;
+  /* asistencia (heatmap / barras) */
+  --d7:#16A34A;--d6:#6FCF8E;--d5:#F5B027;--d14:#F27A6B;--d0:#DC2626;--dnone:#E5E7EB;--out:#F5F5F8;
+  /* escala naranja (folios) */
+  --q0:#FEF0EB;--q1:#FDDDD3;--q2:#FBBFA6;--q3:#F69B76;--q4:#EF7647;--q5:#E85420;--q6:#C94315;--q7:#8F2E0C;
+  --grid:#F0F0F5;
 }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    color-scheme:dark;
-    --bg:#121212;--card:#1a1a19;--card2:#222220;--text:#f0efec;--text2:#c3c2b7;--text3:#8a8980;
-    --border:#33332f;--grid:#2a2a27;
-    --seq-0:#20262e;--seq-1:#184f95;--seq-2:#1c5cab;--seq-3:#256abf;--seq-4:#3987e5;--seq-5:#5598e7;--seq-6:#86b6ef;--seq-7:#cde2fb;
-    --st-good:#3987e5;--st-good2:#1c5cab;--st-none:#2e2e2b;
-  }
-}
-:root[data-theme="dark"]{
-  color-scheme:dark;
-  --bg:#121212;--card:#1a1a19;--card2:#222220;--text:#f0efec;--text2:#c3c2b7;--text3:#8a8980;
-  --border:#33332f;--grid:#2a2a27;
-  --seq-0:#20262e;--seq-1:#184f95;--seq-2:#1c5cab;--seq-3:#256abf;--seq-4:#3987e5;--seq-5:#5598e7;--seq-6:#86b6ef;--seq-7:#cde2fb;
-  --st-good:#3987e5;--st-good2:#1c5cab;--st-none:#2e2e2b;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.45}
-header{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--card);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;flex-wrap:wrap}
-.logo{font-weight:800;font-size:17px;color:var(--or);letter-spacing:-.3px}
-.logo small{display:block;font-size:11px;font-weight:500;color:var(--text3);letter-spacing:0}
-.src{margin-left:auto;font-size:11.5px;color:var(--text2);text-align:right}
-.btn{border:1px solid var(--border);background:var(--card);color:var(--text);border-radius:8px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
-.btn:hover{border-color:var(--or);color:var(--or)}
-.btn.pri{background:var(--or);border-color:var(--or);color:#fff}
-.btn.pri:hover{background:var(--or-dark);color:#fff}
-main{padding:18px 24px 60px;max-width:1600px;margin:0 auto}
-.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:16px;box-shadow:var(--sh)}
-.f{display:flex;flex-direction:column;gap:3px}
-.f label{font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
-.f select,.f input[type=search]{font:inherit;padding:6px 9px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);min-width:140px}
-.f input[type=search]{min-width:200px}
-.chk{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text2);padding-bottom:6px}
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
-.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh)}
-.kpi .l{font-size:11px;color:var(--text2);font-weight:500}
-.kpi .v{font-size:22px;font-weight:700;margin-top:2px;letter-spacing:-.5px}
-.kpi .s{font-size:11px;color:var(--text3);margin-top:1px}
-.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh);min-width:0}
-.card h3{font-size:13px;font-weight:700}
-.card .sub{font-size:11.5px;color:var(--text2);margin:2px 0 10px}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+
+/* SIDEBAR */
+.sidebar{width:var(--sw);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;overflow-y:auto}
+.s-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.s-logo-icon{width:34px;height:34px;background:var(--or);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.s-brand{font-size:15px;font-weight:700;color:var(--or);line-height:1.2}
+.s-sub{font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px}
+.s-nav{padding:10px 10px;flex:1}
+.s-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;padding:8px 8px 4px;margin-top:6px}
+.nav-i{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .12s;user-select:none;margin-bottom:1px;text-decoration:none}
+.nav-i:hover{background:var(--or-light);color:var(--or)}
+.nav-i.active{background:var(--or-light);color:var(--or);font-weight:600}
+.nav-i svg{width:15px;height:15px;stroke:currentColor;fill:none;flex-shrink:0}
+.s-export{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.btn-exp{width:100%;background:var(--or);color:white;border:none;border-radius:8px;padding:10px;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-exp:hover{background:var(--or-dark)}
+.btn-exp svg{width:14px;height:14px;stroke:currentColor;fill:none}
+.btn-sec{width:100%;background:white;color:var(--text2);border:1.5px solid var(--border);border-radius:8px;padding:8px;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-sec:hover{border-color:var(--or);color:var(--or)}
+
+/* MAIN */
+.main{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px}
+.tb-left{display:flex;align-items:center;gap:10px;min-width:0}
+.tb-title{font-size:15px;font-weight:700;color:var(--text);white-space:nowrap}
+.tb-badge{background:var(--or-light);color:var(--or);font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.tb-right{display:flex;align-items:center;gap:10px;min-width:0}
+.tb-src{font-size:11px;color:var(--text2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-src b{color:var(--text)}
+.u-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--or),#FF8C5A);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;flex-shrink:0}
+.content{padding:22px 24px;flex:1}
+
+/* FILTERS */
+.filters{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:14px 18px;margin-bottom:18px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.f{display:flex;flex-direction:column;gap:5px}
+.f-label{font-size:9px;font-weight:700;color:var(--or);text-transform:uppercase;letter-spacing:.7px}
+.fs,.fi{border:1.5px solid var(--border);border-radius:8px;padding:7px 11px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);background:#F9F9FB;outline:none;min-width:150px}
+.fs{cursor:pointer}
+.fs:focus,.fi:focus{border-color:var(--or);background:white}
+.fi{min-width:210px}
+.chk{display:flex;gap:7px;align-items:center;font-size:12.5px;color:var(--text2);padding-bottom:8px;cursor:pointer;user-select:none}
+.chk input{accent-color:var(--or);width:14px;height:14px}
+
+/* GRID */
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.mb{margin-bottom:16px}
+
+/* KPI CARDS */
+.kpi-row{display:grid;gap:14px;margin-bottom:18px}
+.kpi-6{grid-template-columns:repeat(6,1fr)}
+.kpi-c{background:var(--card);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);border:1.5px solid transparent;position:relative;overflow:hidden}
+.kpi-c.hl{border-color:var(--or)}
+.kpi-c.hl::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--or);border-radius:var(--r) var(--r) 0 0}
+.kpi-c.green-top::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--green)}
+.kpi-c.red-top::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--red)}
+.kpi-c.yellow-top::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--yellow)}
+.kpi-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;display:flex;align-items:center;gap:5px}
+.kpi-label svg{width:13px;height:13px;stroke:currentColor;fill:none}
+.kpi-val{font-size:24px;font-weight:800;line-height:1;margin-bottom:5px}
+.kpi-val.or{color:var(--or)}.kpi-val.gr{color:var(--green)}.kpi-val.rd{color:var(--red)}.kpi-val.yl{color:var(--yellow)}.kpi-val.dk{color:var(--text)}
+.kpi-sub{font-size:11px;color:var(--text2)}
+.status-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.st-green{background:var(--green-l);color:var(--green)}
+.st-red{background:var(--red-l);color:var(--red)}
+.st-orange{background:var(--or-light);color:var(--or)}
+.st-yellow{background:var(--yellow-l);color:var(--yellow)}
+
+/* CHART CARD */
+.cc{background:var(--card);border-radius:var(--r);padding:20px 22px;box-shadow:var(--sh);min-width:0}
+.cc-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap}
+.cc-title{font-size:14px;font-weight:700;color:var(--text)}
+.cc-sub{font-size:11px;color:var(--text3);margin-top:2px;max-width:640px}
+.chip{font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;white-space:nowrap}
+.chip-or{background:var(--or-light);color:var(--or)}
+.chip-gy{background:#F3F4F6;color:var(--text2)}
 .chartbox{position:relative;height:220px}
-.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--text2);margin:6px 0 8px}
-.legend span{display:inline-flex;align-items:center;gap:5px}
-.sw{width:11px;height:11px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.06)}
-.hm-head{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:4px}
-.hm-head .sp{flex:1}
-.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.seg button{border:0;background:var(--card);color:var(--text2);font:inherit;font-weight:600;padding:6px 11px;cursor:pointer}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--text2);margin:0 0 10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0}
+.seg{display:inline-flex;background:#F5F5F7;border:1px solid var(--border);border-radius:8px;padding:2px;gap:2px}
+.seg button{border:0;background:transparent;color:var(--text2);font-family:'Inter',sans-serif;font-size:12px;font-weight:600;padding:5px 11px;cursor:pointer;border-radius:6px}
 .seg button.on{background:var(--or);color:#fff}
-#hm-wrap{position:relative;max-height:640px;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-top:6px}
-#hm{display:block}
-.note{font-size:11.5px;color:var(--text3);margin-top:6px}
-#tip{position:fixed;pointer-events:none;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:50;display:none;min-width:180px}
-#tip b{font-weight:700}
-#tip .row{display:flex;justify-content:space-between;gap:14px;color:var(--text2)}
-#tip .row span:last-child{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
-th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);font-weight:600;text-align:left;padding:8px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap;position:sticky;top:0;background:var(--card)}
-th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+.hm-tools{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+#hm-wrap{position:relative;max-height:640px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+#hm{display:block;cursor:pointer}
+.note{font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5}
+
+/* TABLE */
+.tc{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.tc-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tbl-wrap{max-height:540px;overflow:auto}
+table{width:100%;border-collapse:collapse}
+thead{background:#FAFAFA}
+th{padding:8px 14px;font-size:9px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;background:#FAFAFA;cursor:pointer;user-select:none}
 th.sorted{color:var(--or)}
-td{padding:7px 8px;border-bottom:1px solid var(--grid)}
-tbody tr{cursor:pointer}
-tbody tr:hover{background:var(--card2)}
-.tbl-wrap{max-height:520px;overflow:auto}
-.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;white-space:nowrap}
-.pill.crit{background:color-mix(in srgb,var(--st-crit) 16%,transparent);color:var(--st-crit)}
-.pill.warn{background:color-mix(in srgb,var(--st-warn) 22%,transparent);color:color-mix(in srgb,var(--st-warn) 55%,var(--text))}
-.pill.ok{background:color-mix(in srgb,var(--st-good) 14%,transparent);color:var(--st-good)}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:10px 14px;font-size:13px;color:var(--text);border-bottom:1px solid #F5F5F8}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#FAFAFA;cursor:pointer}
+.tc-foot{padding:10px 20px;font-size:11px;color:var(--text3);border-top:1px solid var(--border)}
 .muted{color:var(--text3)}
-#loader{max-width:560px;margin:80px auto;text-align:center;background:var(--card);border:2px dashed var(--border);border-radius:16px;padding:40px 30px}
+
+/* BUTTONS */
+.btn-outline{border:1.5px solid var(--border);background:white;color:var(--text2);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:'Inter',sans-serif}
+.btn-outline:hover{border-color:var(--or);color:var(--or)}
+.btn-outline svg{width:13px;height:13px;stroke:currentColor;fill:none}
+.btn-primary{background:var(--or);color:white;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;border:none;font-family:'Inter',sans-serif}
+.btn-primary:hover{background:var(--or-dark)}
+
+/* LOADER */
+#loader{max-width:560px;margin:60px auto;text-align:center;background:var(--card);border:2px dashed var(--or-border);border-radius:16px;padding:40px 32px;box-shadow:var(--sh)}
 #loader.drag{border-color:var(--or);background:var(--or-light)}
-#loader h2{font-size:18px;margin-bottom:8px}
-#loader p{color:var(--text2);margin-bottom:16px}
-#loader code{background:var(--card2);padding:2px 6px;border-radius:5px;font-size:12px}
+#loader .ld-icon{width:48px;height:48px;border-radius:12px;background:var(--or-light);display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+#loader .ld-icon svg{width:24px;height:24px;stroke:var(--or);fill:none}
+#loader h2{font-size:18px;font-weight:800;margin-bottom:8px}
+#loader p{color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:20px}
+#loader code{background:#F3F4F6;padding:2px 6px;border-radius:5px;font-size:12px}
 #app{display:none}
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:40;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 16px}
-.modal{background:var(--card);border-radius:16px;max-width:1100px;width:100%;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
-.modal-h{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
-.modal-h h2{font-size:18px}
-.modal-h .x{margin-left:auto}
-.mini{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
-.mini div{background:var(--card2);border-radius:10px;padding:9px 11px}
-.mini .l{font-size:10.5px;color:var(--text2)}
-.mini .v{font-size:17px;font-weight:700}
-#cal{display:block;max-width:100%}
-@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.grid3{grid-template-columns:1fr}.mini{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:640px){header,main{padding-left:16px;padding-right:16px}.kpis{grid-template-columns:repeat(2,1fr)}.f select,.f input[type=search]{min-width:0;width:100%}.f{flex:1 1 45%}.src{margin-left:0;text-align:left}}
+
+/* TOOLTIP */
+#tip{position:fixed;pointer-events:none;background:white;color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;box-shadow:var(--sh2);z-index:300;display:none;min-width:200px}
+#tip b{font-weight:700}
+#tip .row{display:flex;justify-content:space-between;gap:14px;color:var(--text2);padding:1px 0}
+#tip .row span:last-child{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* MODAL / FICHA */
+.modal-bg{position:fixed;inset:0;background:rgba(15,15,26,.55);display:none;z-index:400;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 16px}
+.modal{background:var(--bg);border-radius:16px;max-width:1120px;width:100%;padding:20px;box-shadow:0 32px 80px rgba(0,0,0,.35)}
+.tec-profile{background:var(--card);border-radius:var(--r);padding:20px 22px;box-shadow:var(--sh);display:flex;align-items:center;gap:18px;margin-bottom:16px;flex-wrap:wrap}
+.tec-av{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:19px;font-weight:700;flex-shrink:0;background:linear-gradient(135deg,var(--or),#FF8C5A)}
+.tec-info{flex:1;min-width:200px}
+.tec-name{font-size:20px;font-weight:800;margin-bottom:3px}
+.tec-coord{font-size:12px;color:var(--text2);margin-bottom:8px}
+.tec-tags{display:flex;gap:5px;flex-wrap:wrap}
+.tec-tag{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;background:#F3F4F6;color:var(--text2)}
+.tec-tag.sp{background:var(--or-light);color:var(--or)}
+#cal{display:block}
+
+/* LOGIN SCREEN */
+#login-screen{position:fixed;z-index:9999;inset:0;background:linear-gradient(135deg,#1a1a2e 0%,#0f0f1a 100%);display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif}
+.login-card{background:white;border-radius:20px;padding:40px 44px;width:min(420px,90vw);box-shadow:0 32px 80px rgba(0,0,0,.35)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.login-brand{font-size:22px;font-weight:800;color:var(--or);line-height:1.1}
+.login-brand-sub{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-top:2px}
+.login-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px}
+.login-subtitle{font-size:13px;color:var(--text2);margin-bottom:28px;line-height:1.5}
+.login-field{margin-bottom:16px}
+.login-label{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:block}
+.login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:#F9F9FB;outline:none;transition:border-color .15s}
+.login-input:focus{border-color:var(--or);background:white}
+.login-btn{width:100%;background:var(--or);color:white;border:none;border-radius:10px;padding:13px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:background .15s}
+.login-btn:hover:not(:disabled){background:var(--or-dark)}
+.login-btn:disabled{opacity:.65;cursor:not-allowed}
+.login-error{color:var(--red);font-size:12px;font-weight:600;margin-top:10px;padding:10px 12px;background:var(--red-l);border-radius:8px;display:none}
+.login-spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
+
+@media (max-width:1200px){.kpi-6{grid-template-columns:repeat(3,1fr)}.g3{grid-template-columns:1fr}}
+@media (max-width:900px){
+  .sidebar{display:none}.main{margin-left:0}
+  .topbar{padding:0 16px}.content{padding:16px}
+  .tb-src{display:none}
+  .kpi-6{grid-template-columns:repeat(2,1fr)}
+  .fs,.fi{min-width:0;width:100%}.f{flex:1 1 45%}
+}
 </style>
 </head>
 <body>
-<header>
-  <div class="logo">QiORA<small>Asistencia y productividad · Esquema OS</small></div>
-  <div class="src" id="src">Sin datos</div>
-  <label class="btn" for="file-in2">Cargar JSON</label>
-  <input type="file" id="file-in2" accept=".json" hidden/>
-</header>
 
-<div id="loader">
-  <h2>Carga los datos</h2>
-  <p>Genera el archivo con <code>.venv/bin/python snowflake/generar_bonos.py</code> y arrastra aquí <code>datos_salida/bonos_os.json</code>, o ábrelo con <code>./visualizar.sh</code> para que cargue solo.</p>
-  <label class="btn pri" for="file-in">Elegir archivo</label>
-  <input type="file" id="file-in" accept=".json" hidden/>
+<!-- ═══════════ LOGIN ═══════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <img class="qiora-logo" style="width:44px;height:44px;border-radius:12px;flex-shrink:0" alt="QiORA"/>
+      <div>
+        <div class="login-brand">QiORA</div>
+        <div class="login-brand-sub">Sistema de Bonos · TotalPlay</div>
+      </div>
+    </div>
+    <div class="login-title">Iniciar sesión</div>
+    <div class="login-subtitle">Accede con las credenciales asignadas por tu administrador.</div>
+    <div class="login-field">
+      <label class="login-label" for="login-email">Correo electrónico</label>
+      <input class="login-input" type="email" id="login-email" placeholder="usuario@qiora.com" autocomplete="email"/>
+    </div>
+    <div class="login-field">
+      <label class="login-label" for="login-password">Contraseña</label>
+      <input class="login-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="login-btn" id="login-btn">Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
 </div>
 
-<main id="app">
-  <div class="filters">
-    <div class="f"><label>Sucursal</label><select id="f-suc"></select></div>
-    <div class="f"><label>Coordinador</label><select id="f-coord"></select></div>
-    <div class="f"><label>Póliza</label><select id="f-pol"></select></div>
-    <div class="f"><label>Cuadrilla</label><select id="f-cua"></select></div>
-    <div class="f"><label>Desde</label><select id="f-from"></select></div>
-    <div class="f"><label>Hasta</label><select id="f-to"></select></div>
-    <div class="f"><label>Técnico</label><input type="search" id="f-q" placeholder="Nombre o usuario FFM"/></div>
-    <label class="chk"><input type="checkbox" id="f-cat" checked/> Solo catálogo</label>
-    <label class="chk"><input type="checkbox" id="f-parcial" checked/> Excluir semana en curso</label>
+<!-- ═══════════ SIDEBAR ═══════════ -->
+<nav class="sidebar">
+  <div class="s-logo">
+    <div class="s-logo-icon"><img class="qiora-logo" style="width:22px;height:22px;filter:invert(1)" alt="QiORA"/></div>
+    <div><div class="s-brand">QiORA</div><div class="s-sub">Bonos Técnicos</div></div>
   </div>
-
-  <div class="kpis" id="kpis"></div>
-
-  <div class="grid3">
-    <div class="card"><h3>Días trabajados por técnico</h3><div class="sub">Promedio semanal · referencia: 6 días</div><div class="chartbox"><canvas id="c-dias"></canvas></div></div>
-    <div class="card"><h3>Folios por técnico</h3><div class="sub">Promedio semanal de OS completadas</div><div class="chartbox"><canvas id="c-os"></canvas></div></div>
-    <div class="card"><h3>Distribución de asistencia</h3><div class="sub">% de técnicos por días trabajados en la semana</div>
-      <div class="legend"><span><i class="sw" style="background:var(--st-good)"></i>6–7 días</span><span><i class="sw" style="background:var(--st-warn)"></i>5 días (−50%)</span><span><i class="sw" style="background:var(--st-crit)"></i>≤4 días (−100%)</span></div>
-      <div class="chartbox" style="height:194px"><canvas id="c-dist"></canvas></div></div>
-  </div>
-
-  <div class="card" style="margin-bottom:16px">
-    <div class="hm-head">
-      <div><h3>Mapa semanal por técnico</h3><div class="sub" id="hm-sub">Cada fila es un técnico y cada columna una semana (lunes a domingo). Clic en una fila para ver su ficha.</div></div>
-      <div class="sp"></div>
-      <div class="f"><label>Ver</label><div class="seg" id="hm-mode"><button data-m="dias" class="on">Días trabajados</button><button data-m="os">Folios</button><button data-m="osd">Folios / día</button></div></div>
-      <div class="f"><label>Ordenar por</label><select id="hm-sort">
-        <option value="w4">Más semanas con ≤4 días</option>
-        <option value="avgD">Peor asistencia promedio</option>
-        <option value="osSemAsc">Menor productividad</option>
-        <option value="osSemDesc">Mayor productividad</option>
-        <option value="trend">Mayor caída de productividad</option>
-        <option value="nombre">Nombre</option>
-      </select></div>
+  <div class="s-nav">
+    <div class="s-label">Asistencia y productividad</div>
+    <div class="nav-i active" data-go="sec-resumen">
+      <svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+      Resumen
     </div>
-    <div class="legend" id="hm-legend"></div>
-    <div id="hm-wrap"><canvas id="hm"></canvas></div>
-    <div class="note" id="hm-note"></div>
+    <div class="nav-i" data-go="sec-mapa">
+      <svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="21"/><line x1="15" y1="4" x2="15" y2="21"/></svg>
+      Mapa semanal
+    </div>
+    <div class="nav-i" data-go="sec-tabla">
+      <svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      Detección por técnico
+    </div>
+    <div class="s-label">Sistema</div>
+    <a class="nav-i" href="index.html">
+      <svg viewBox="0 0 24 24" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
+      Sistema de Bonos
+    </a>
   </div>
 
-  <div class="card">
-    <div class="hm-head">
-      <div><h3>Detección por técnico</h3><div class="sub">Periodo seleccionado. La tendencia compara el promedio de folios de las últimas 4 semanas activas contra las 8 anteriores.</div></div>
-      <div class="sp"></div>
-      <button class="btn" id="csv">Exportar CSV</button>
+  <div id="user-info-bar" style="padding:12px 16px;border-top:1px solid var(--border);display:none">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0" id="user-avatar">—</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="user-display-name">—</div>
+        <div style="font-size:10px;color:var(--text3)" id="user-display-rol">—</div>
+      </div>
+      <button id="logout-btn" title="Cerrar sesión" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:6px;display:flex;align-items:center">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
     </div>
-    <div class="tbl-wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
-    <div class="note" id="tbl-note"></div>
   </div>
-</main>
+
+  <div class="s-export">
+    <button class="btn-exp" id="csv">
+      <svg viewBox="0 0 24 24" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Exportar CSV
+    </button>
+    <label class="btn-sec" for="file-in2">Cargar otro JSON</label>
+    <input type="file" id="file-in2" accept=".json" hidden/>
+  </div>
+</nav>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<div class="main">
+  <div class="topbar">
+    <div class="tb-left">
+      <div class="tb-title">Asistencia y Productividad</div>
+      <div class="tb-badge">Esquema OS</div>
+    </div>
+    <div class="tb-right">
+      <div class="tb-src" id="src">Sin datos cargados</div>
+      <div class="u-avatar" id="topbar-avatar">—</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="loader">
+      <div class="ld-icon"><svg viewBox="0 0 24 24" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <h2>Carga los datos</h2>
+      <p>Arrastra aquí <code>datos_salida/bonos_os.json</code> (lo genera <code>snowflake/generar_bonos.py</code>), o abre el visualizador con <code>./visualizar.sh</code> para que se cargue solo.</p>
+      <label class="btn-primary" for="file-in">Elegir archivo</label>
+      <input type="file" id="file-in" accept=".json" hidden/>
+    </div>
+
+    <div id="app">
+      <div class="filters">
+        <div class="f"><span class="f-label">Sucursal</span><select class="fs" id="f-suc"></select></div>
+        <div class="f"><span class="f-label">Coordinador</span><select class="fs" id="f-coord"></select></div>
+        <div class="f"><span class="f-label">Póliza</span><select class="fs" id="f-pol"></select></div>
+        <div class="f"><span class="f-label">Cuadrilla</span><select class="fs" id="f-cua"></select></div>
+        <div class="f"><span class="f-label">Desde</span><select class="fs" id="f-from"></select></div>
+        <div class="f"><span class="f-label">Hasta</span><select class="fs" id="f-to"></select></div>
+        <div class="f"><span class="f-label">Técnico</span><input class="fi" type="search" id="f-q" placeholder="Nombre o usuario FFM"/></div>
+        <label class="chk"><input type="checkbox" id="f-cat" checked/> Solo catálogo</label>
+        <label class="chk"><input type="checkbox" id="f-parcial" checked/> Excluir semana en curso</label>
+      </div>
+
+      <div id="sec-resumen">
+        <div class="kpi-row kpi-6" id="kpis"></div>
+        <div class="g3 mb">
+          <div class="cc">
+            <div class="cc-head"><div><div class="cc-title">Días trabajados por técnico</div><div class="cc-sub">Promedio semanal · referencia: 6 días</div></div><span class="chip chip-or">Asistencia</span></div>
+            <div class="chartbox"><canvas id="c-dias"></canvas></div>
+          </div>
+          <div class="cc">
+            <div class="cc-head"><div><div class="cc-title">Folios por técnico</div><div class="cc-sub">Promedio semanal de OS completadas</div></div><span class="chip chip-or">Productividad</span></div>
+            <div class="chartbox"><canvas id="c-os"></canvas></div>
+          </div>
+          <div class="cc">
+            <div class="cc-head"><div><div class="cc-title">Distribución de asistencia</div><div class="cc-sub">% de técnicos por días trabajados en la semana</div></div></div>
+            <div class="legend"><span><i class="dot" style="background:var(--d7)"></i>6–7 días</span><span><i class="dot" style="background:var(--d5)"></i>5 días (−50%)</span><span><i class="dot" style="background:var(--d0)"></i>≤4 días (−100%)</span></div>
+            <div class="chartbox" style="height:190px"><canvas id="c-dist"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cc mb" id="sec-mapa">
+        <div class="cc-head">
+          <div><div class="cc-title">Mapa semanal por técnico</div><div class="cc-sub">Cada fila es un técnico y cada columna una semana (lunes a domingo). Clic en una fila para ver su ficha.</div></div>
+          <div class="hm-tools">
+            <div class="f"><span class="f-label">Ver</span><div class="seg" id="hm-mode"><button data-m="dias" class="on">Días trabajados</button><button data-m="os">Folios</button><button data-m="osd">Folios / día</button></div></div>
+            <div class="f"><span class="f-label">Ordenar por</span><select class="fs" id="hm-sort">
+              <option value="w4">Más semanas con ≤4 días</option>
+              <option value="avgD">Peor asistencia promedio</option>
+              <option value="osSemAsc">Menor productividad</option>
+              <option value="osSemDesc">Mayor productividad</option>
+              <option value="trend">Mayor caída de productividad</option>
+              <option value="nombre">Nombre</option>
+            </select></div>
+          </div>
+        </div>
+        <div class="legend" id="hm-legend"></div>
+        <div id="hm-wrap"><canvas id="hm"></canvas></div>
+        <div class="note" id="hm-note"></div>
+      </div>
+
+      <div class="tc" id="sec-tabla">
+        <div class="tc-head">
+          <div><div class="cc-title">Detección por técnico</div><div class="cc-sub">Periodo seleccionado. La tendencia compara el promedio de folios de las últimas 4 semanas activas contra las 8 anteriores.</div></div>
+          <button class="btn-outline" id="csv2"><svg viewBox="0 0 24 24" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exportar CSV</button>
+        </div>
+        <div class="tbl-wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+        <div class="tc-foot" id="tbl-note"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="modal-bg" id="modal-bg"><div class="modal" id="modal"></div></div>
 <div id="tip"></div>
 
 <script>
 'use strict';
+const QIORA_LOGO='data:image/png;base64,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';
+document.querySelectorAll('.qiora-logo').forEach(el=>el.src=QIORA_LOGO);
+
 // ───────────────────────── estado ─────────────────────────
-let D=null, TECS=[], WEEKS=[], NW=0, PARTIAL=new Set();
-const S={suc:'',coord:'',pol:'',cua:'',from:0,to:0,q:'',soloCat:true,exclParcial:true,mode:'dias',sort:'w4',tSort:'w4',tDir:1};
+let D=null, TECS=[], WEEKS=[], NW=0, PARTIAL=new Set(), BOUND=false;
+const S={suc:'',coord:'',pol:'',cua:'',from:0,to:0,q:'',soloCat:true,exclParcial:true,mode:'dias',sort:'w4',tSort:'w4'};
 const charts={};
 const fmt=new Intl.NumberFormat('es-MX',{maximumFractionDigits:1});
 const fmt0=new Intl.NumberFormat('es-MX',{maximumFractionDigits:0});
@@ -192,20 +376,59 @@ const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pop=m=>{let c=0;while(m){c+=m&1;m>>=1}return c};
+const initials=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 
 function parseD(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
 function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7)}
 function wkLabel(i){const d=WEEKS[i];return `${d.getDate()} ${MES[d.getMonth()]}`}
 function wkRange(i){const a=WEEKS[i],b=new Date(a);b.setDate(b.getDate()+6);return `Sem ${isoWeek(a)} · ${a.getDate()} ${MES[a.getMonth()]} – ${b.getDate()} ${MES[b.getMonth()]}`}
 
-// ───────────────────────── carga ─────────────────────────
-async function boot(){
-  try{
-    const r=await fetch('datos_salida/bonos_os.json',{cache:'no-store'});
-    if(r.ok){init(await r.json());return}
-  }catch(_){}
+// ───────────────────────── login (Supabase, mismo que index.html) ─────────────────────────
+const SUPABASE_URL='https://tfeqaqocendwvanlible.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmZXFhcW9jZW5kd3ZhbmxpYmxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NjYxODQsImV4cCI6MjA5MDI0MjE4NH0.Hq8cCbjFKTNrvja9BzgU1vB2nG0XtbKK0C3AjJGPcWA';
+const _sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const ROL_LABELS={admin:'Administrador',director:'Director',finanzas:'Finanzas',lider_distrital:'Líder Distrital',coordinador:'Coordinador',tecnico:'Técnico'};
+let _currentUser=null;
+
+function showLogin(msg){
+  $('login-screen').style.display='flex';
+  $('login-btn').disabled=false;$('login-btn').innerHTML='Entrar';
+  const e=$('login-error');e.textContent=msg||'';e.style.display=msg?'block':'none';
 }
-function readFile(f){const fr=new FileReader();fr.onload=()=>{try{init(JSON.parse(fr.result))}catch(e){alert('El archivo no es un JSON válido del generador.')}};fr.readAsText(f)}
+async function fetchProfile(authUser){
+  const {data,error}=await _sb.from('usuarios').select('*').eq('id',authUser.id).single();
+  if(error||!data){await _sb.auth.signOut();showLogin('Tu usuario no tiene perfil configurado. Contacta al administrador.');return}
+  _currentUser={email:data.email||authUser.email,nombre:data.nombre||data.name||'',rol:data.rol||'tecnico'};
+  $('login-screen').style.display='none';
+  const ini=initials(_currentUser.nombre||_currentUser.email);
+  $('user-avatar').textContent=ini;$('topbar-avatar').textContent=ini;
+  $('user-display-name').textContent=_currentUser.nombre||_currentUser.email;
+  $('user-display-rol').textContent=ROL_LABELS[_currentUser.rol]||_currentUser.rol;
+  $('user-info-bar').style.display='block';
+  if(!D)boot();
+}
+async function doLogin(){
+  const email=$('login-email').value.trim(),password=$('login-password').value;
+  if(!email||!password){showLogin('Ingresa tu correo y contraseña.');return}
+  $('login-error').style.display='none';
+  const btn=$('login-btn');btn.disabled=true;btn.innerHTML='<div class="login-spinner"></div>';
+  const {data,error}=await _sb.auth.signInWithPassword({email,password});
+  if(error){showLogin(error.message==='Invalid login credentials'?'Credenciales incorrectas. Verifica tu correo y contraseña.':error.message);return}
+  await fetchProfile(data.user);
+}
+async function doLogout(){await _sb.auth.signOut();_currentUser=null;$('user-info-bar').style.display='none';showLogin()}
+$('login-btn').onclick=doLogin;
+$('login-email').onkeydown=e=>{if(e.key==='Enter')$('login-password').focus()};
+$('login-password').onkeydown=e=>{if(e.key==='Enter')doLogin()};
+$('logout-btn').onclick=doLogout;
+_sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&_currentUser){_currentUser=null;showLogin()}});
+(async()=>{const {data:{session}}=await _sb.auth.getSession();if(session)await fetchProfile(session.user);else showLogin()})();
+
+// ───────────────────────── carga de datos ─────────────────────────
+async function boot(){
+  try{const r=await fetch('datos_salida/bonos_os.json',{cache:'no-store'});if(r.ok){init(await r.json());return}}catch(_){}
+}
+function readFile(f){const fr=new FileReader();fr.onload=()=>{try{init(JSON.parse(fr.result))}catch(e){$('src').textContent='El archivo no es un JSON válido del generador.'}};fr.readAsText(f)}
 ['file-in','file-in2'].forEach(id=>$(id).addEventListener('change',e=>e.target.files[0]&&readFile(e.target.files[0])));
 const ld=$('loader');
 ld.addEventListener('dragover',e=>{e.preventDefault();ld.classList.add('drag')});
@@ -222,7 +445,7 @@ function init(data){
     // dentro del periodo activo, una semana sin órdenes = 0 días (falta completa)
     for(let i=first;i<=last;i++) if(!wk[i]) wk[i]={m:0,d:0,os:0,mt:0,em:0};
     t.b.forEach(r=>b[r[0]]=r);
-    // semana de alta / baja: casi siempre incompleta → se excluye de las estadísticas de asistencia
+    // semana de alta / baja: casi siempre incompleta → se excluye de las estadísticas
     const edge=new Map();
     if(first>0&&first<NW)edge.set(first,'alta');
     if(last>=0&&last<NW-2&&last!==first)edge.set(last,'baja');
@@ -230,10 +453,10 @@ function init(data){
     return {...t, wk, edge, bono:b, sucNom:suc?suc.nombre:t.s, cfg:suc||null, nl:(t.n+' '+t.u).toLowerCase()};
   });
   $('loader').style.display='none'; $('app').style.display='block';
-  $('src').innerHTML=`Snowflake · datos al <b>${esc(D.meta.fecha_max)}</b> · ${fmt0.format(D.meta.ordenes)} folios · generado ${esc(D.meta.generado.replace('T',' '))}`;
-  // rango por defecto: todo el año
+  $('src').innerHTML=`Snowflake · datos al <b>${esc(D.meta.fecha_max)}</b> · ${fmt0.format(D.meta.ordenes)} folios`;
+  $('src').title=`Generado ${D.meta.generado.replace('T',' ')}`;
   S.from=0; S.to=NW-1;
-  fillFilters(); bindUI(); render();
+  fillFilters(); if(!BOUND){bindUI();BOUND=true} render();
 }
 
 // ───────────────────────── filtros ─────────────────────────
@@ -262,12 +485,15 @@ function bindUI(){
   $('f-cat').onchange=e=>{S.soloCat=e.target.checked;fillFilters();render()};
   $('f-parcial').onchange=e=>{S.exclParcial=e.target.checked;render()};
   document.querySelectorAll('#hm-mode button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#hm-mode button').forEach(x=>x.classList.toggle('on',x===b));S.mode=b.dataset.m;drawHeatmap()});
-  $('hm-sort').onchange=e=>{S.sort=e.target.value;S.tSort=e.target.value;S.tDir=1;render()};
-  $('csv').onclick=exportCSV;
+  $('hm-sort').onchange=e=>{S.sort=e.target.value;S.tSort=e.target.value;render()};
+  $('csv').onclick=exportCSV; $('csv2').onclick=exportCSV;
   $('modal-bg').onclick=e=>{if(e.target.id==='modal-bg')closeModal()};
   document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
   let rt;window.addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(drawHeatmap,150)});
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+  document.querySelectorAll('.nav-i[data-go]').forEach(n=>n.onclick=()=>{
+    document.querySelectorAll('.nav-i[data-go]').forEach(x=>x.classList.toggle('active',x===n));
+    const el=$(n.dataset.go);window.scrollTo({top:el.getBoundingClientRect().top+scrollY-72,behavior:'smooth'});
+  });
 }
 function weekIdx(){const a=[];for(let i=S.from;i<=S.to;i++){if(S.exclParcial&&PARTIAL.has(i))continue;a.push(i)}return a}
 function filtered(){
@@ -294,39 +520,47 @@ function render(){
   CUR=T.map(t=>({t,st:techStats(t,W)})).filter(x=>x.st.n>0);
   renderKPIs(CUR,W); renderCharts(CUR.map(x=>x.t),W); drawHeatmap(); renderTable();
 }
+const IC={
+  users:'<svg viewBox="0 0 24 24" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
+  cal:'<svg viewBox="0 0 24 24" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  half:'<svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20"/></svg>',
+  os:'<svg viewBox="0 0 24 24" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+  money:'<svg viewBox="0 0 24 24" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+};
+function kpi(cls,icon,label,val,valCls,sub){return `<div class="kpi-c ${cls}"><div class="kpi-label">${IC[icon]}${label}</div><div class="kpi-val ${valCls}">${val}</div><div class="kpi-sub">${sub}</div></div>`}
 function renderKPIs(R,W){
   let tw=0,sd=0,sos=0,w4=0,w5=0,bono=0,bw=0;
   R.forEach(({st})=>{tw+=st.n;sd+=st.sd;sos+=st.sos;w4+=st.w4;w5+=st.w5;bono+=st.bono;bw+=st.bonoW});
   const ag=weekAgg(R.map(x=>x.t),W), avgAct=ag.length?ag.reduce((a,b)=>a+b.n,0)/ag.length:0;
-  const k=[
-    ['Técnicos',fmt0.format(R.length),`${fmt0.format(avgAct)} activos por semana en promedio`],
-    ['Días trabajados',tw?fmt.format(sd/tw):'—','promedio por técnico por semana'],
-    ['Semanas con ≤4 días',tw?fmt.format(w4/tw*100)+'%':'—',`${fmt0.format(w4)} técnico-semanas · pierden el 100%`],
-    ['Semanas con 5 días',tw?fmt.format(w5/tw*100)+'%':'—',`${fmt0.format(w5)} técnico-semanas · pierden el 50%`],
-    ['Folios por técnico',tw?fmt.format(sos/tw):'—',`por semana · ${sd?fmt.format(sos/sd):'—'} por día trabajado`],
-    ['Bono esquema OS',bw?money(bono):'—',bw?`${fmt0.format(bw)} técnico-semanas desde ${D.meta.vigente_desde}`:`vigente desde ${D.meta.vigente_desde}`],
-  ];
-  $('kpis').innerHTML=k.map(([l,v,s])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+  $('kpis').innerHTML=[
+    kpi('hl','users','Técnicos',fmt0.format(R.length),'or',`${fmt0.format(avgAct)} activos por semana`),
+    kpi('','cal','Días trabajados',tw?fmt.format(sd/tw):'—','dk','promedio por técnico / semana'),
+    kpi('red-top','alert','Semanas ≤4 días',tw?fmt.format(w4/tw*100)+'%':'—','rd',`${fmt0.format(w4)} técnico-semanas · −100%`),
+    kpi('yellow-top','half','Semanas con 5 días',tw?fmt.format(w5/tw*100)+'%':'—','yl',`${fmt0.format(w5)} técnico-semanas · −50%`),
+    kpi('','os','Folios por técnico',tw?fmt.format(sos/tw):'—','dk',`por semana · ${sd?fmt.format(sos/sd):'—'} por día`),
+    kpi('green-top','money','Bono esquema OS',bw?money(bono):'—','gr',bw?`${fmt0.format(bw)} técnico-semanas`:`vigente desde ${D.meta.vigente_desde}`),
+  ].join('');
 }
 function baseOpts(yMax,suffix){
-  const tc=css('--text2'),gc=css('--grid');
+  const tc=css('--text3'),gc=css('--grid');
   return {responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
-    plugins:{legend:{display:false},tooltip:{backgroundColor:css('--card'),titleColor:css('--text'),bodyColor:css('--text2'),borderColor:css('--border'),borderWidth:1,padding:9,
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:css('--text'),bodyColor:css('--text2'),borderColor:css('--border'),borderWidth:1,padding:10,cornerRadius:8,
+      titleFont:{family:'Inter',weight:'700',size:12},bodyFont:{family:'Inter',size:12},
       callbacks:{title:it=>wkRange(it[0].raw.i??+it[0].label),label:c=>` ${c.dataset.label}: ${fmt.format(c.parsed.y)}${suffix||''}`}}},
-    scales:{x:{grid:{display:false},ticks:{color:tc,maxRotation:0,autoSkip:true,maxTicksLimit:10,font:{size:10.5}},border:{color:gc}},
-            y:{beginAtZero:true,max:yMax,grid:{color:gc},ticks:{color:tc,font:{size:10.5}},border:{display:false}}}};
+    scales:{x:{grid:{display:false},ticks:{color:tc,maxRotation:0,autoSkip:true,maxTicksLimit:10,font:{family:'Inter',size:10}},border:{color:css('--border')}},
+            y:{beginAtZero:true,max:yMax,grid:{color:gc},ticks:{color:tc,font:{family:'Inter',size:10}},border:{display:false}}}};
 }
 function mkChart(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart($(id),cfg)}
 function renderCharts(T,W){
   const ag=weekAgg(T,W), labels=ag.map(a=>wkLabel(a.i));
-  const acc=css('--st-good');
-  const ptLine=(data,label,color)=>({label,data:data.map((y,k)=>({x:labels[k],y,i:ag[k].i})),borderColor:color,backgroundColor:color,borderWidth:2,pointRadius:0,pointHoverRadius:5,tension:.25,spanGaps:true});
+  const line=(data,label,color,fill)=>({label,data:data.map((y,k)=>({x:labels[k],y,i:ag[k].i})),borderColor:color,backgroundColor:fill||color,fill:!!fill,borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:color,tension:.3,spanGaps:true});
   const ref=(v,label)=>({label,data:labels.map((x,k)=>({x,y:v,i:ag[k].i})),borderColor:css('--text3'),borderWidth:1,borderDash:[4,4],pointRadius:0,pointHoverRadius:0});
-  mkChart('c-dias',{type:'line',data:{labels,datasets:[ptLine(ag.map(a=>a.avgD),'Días promedio',acc),ref(6,'Referencia')]},options:baseOpts(7)});
-  mkChart('c-os',{type:'line',data:{labels,datasets:[ptLine(ag.map(a=>a.osT),'Folios por técnico',css('--or'))]},options:baseOpts()});
+  mkChart('c-dias',{type:'line',data:{labels,datasets:[line(ag.map(a=>a.avgD),'Días promedio',css('--or'),'rgba(232,84,32,.08)'),ref(6,'Referencia')]},options:baseOpts(7)});
+  mkChart('c-os',{type:'line',data:{labels,datasets:[line(ag.map(a=>a.osT),'Folios por técnico',css('--or'),'rgba(232,84,32,.08)')]},options:baseOpts()});
   const o=baseOpts(100,'%');o.scales.x.stacked=true;o.scales.y.stacked=true;
-  const bar=(k,label,color)=>({label,data:ag.map(a=>({x:wkLabel(a.i),y:a[k],i:a.i})),backgroundColor:color,borderColor:css('--card'),borderWidth:{top:1},borderSkipped:false,barPercentage:.92,categoryPercentage:.95});
-  mkChart('c-dist',{type:'bar',data:{labels,datasets:[bar('pG','6–7 días',css('--st-good')),bar('p5','5 días',css('--st-warn')),bar('p4','≤4 días',css('--st-crit'))]},options:o});
+  const bar=(k,label,color)=>({label,data:ag.map(a=>({x:wkLabel(a.i),y:a[k],i:a.i})),backgroundColor:color,borderColor:'#fff',borderWidth:{top:1},borderSkipped:false,barPercentage:.92,categoryPercentage:.95});
+  mkChart('c-dist',{type:'bar',data:{labels,datasets:[bar('pG','6–7 días',css('--d7')),bar('p5','5 días',css('--d5')),bar('p4','≤4 días',css('--d0'))]},options:o});
 }
 
 // ───────────────────────── mapa de calor (canvas) ─────────────────────────
@@ -340,24 +574,23 @@ const SORTS={
 };
 let HM={rows:[],cols:[],cw:0,ch:15,lw:230,hh:30};
 function cellColor(c){
-  if(!c)return null;
   if(S.mode==='dias'){
-    if(c.d===0)return css('--st-crit');
-    if(c.d<=4)return css('--st-serious');
-    if(c.d===5)return css('--st-warn');
-    if(c.d===6)return css('--st-good2');
-    return css('--st-good');
+    if(c.d===0)return css('--d0');
+    if(c.d<=4)return css('--d14');
+    if(c.d===5)return css('--d5');
+    if(c.d===6)return css('--d6');
+    return css('--d7');
   }
   const v=S.mode==='os'?c.os:(c.d?c.os/c.d:0);
   const cuts=S.mode==='os'?[1,8,14,18,22,26,30]:[.5,1.5,2.5,3,3.5,4.2,5];
   let k=0;while(k<cuts.length&&v>=cuts[k])k++;
-  return css('--seq-'+k);
+  return css('--q'+k);
 }
 function legendHTML(){
-  if(S.mode==='dias') return [['--st-good','7 días'],['--st-good2','6 días'],['--st-warn','5 días (−50%)'],['--st-serious','1–4 días (−100%)'],['--st-crit','0 días (sin órdenes)'],['--card2','Fuera de periodo / sin alta']]
-    .map(([v,l])=>`<span><i class="sw" style="background:var(${v})"></i>${l}</span>`).join('');
+  if(S.mode==='dias') return [['--d7','7 días'],['--d6','6 días'],['--d5','5 días (−50%)'],['--d14','1–4 días (−100%)'],['--d0','0 días (sin órdenes)'],['--out','Fuera de periodo']]
+    .map(([v,l])=>`<span><i class="dot" style="background:var(${v});${v==='--out'?'border:1px solid var(--border)':''}"></i>${l}</span>`).join('');
   const lab=S.mode==='os'?['0','1–7','8–13','14–17','18–21','22–25','26–29','30+']:['<0.5','0.5–1.4','1.5–2.4','2.5–2.9','3–3.4','3.5–4.1','4.2–4.9','5+'];
-  return `<span class="muted">${S.mode==='os'?'Folios en la semana':'Folios por día trabajado'}:</span>`+lab.map((l,k)=>`<span><i class="sw" style="background:var(--seq-${k})"></i>${l}</span>`).join('');
+  return `<span class="muted">${S.mode==='os'?'Folios en la semana':'Folios por día trabajado'}:</span>`+lab.map((l,k)=>`<span><i class="dot" style="background:var(--q${k})"></i>${l}</span>`).join('');
 }
 function drawHeatmap(){
   if(!D)return;
@@ -373,30 +606,29 @@ function drawHeatmap(){
   const dpr=window.devicePixelRatio||1;
   cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
   const g=cv.getContext('2d');g.scale(dpr,dpr);
-  g.fillStyle=css('--card');g.fillRect(0,0,W,H);
-  const txt=css('--text'),txt3=css('--text3'),grid=css('--grid'),out=css('--card2');
-  g.font='500 10.5px Inter, system-ui';g.textBaseline='middle';
-  // encabezado: mes + número de semana
-  let lastM=-1;
+  g.fillStyle='#fff';g.fillRect(0,0,W,H);
+  const txt=css('--text'),txt3=css('--text3'),grid=css('--grid'),out=css('--out');
+  g.textBaseline='middle';
+  let lastM=-1,lastX=-99;
   cols.forEach((i,k)=>{const d=WEEKS[i],x=lw+k*cw;
-    if(d.getMonth()!==lastM){lastM=d.getMonth();g.fillStyle=txt;g.font='600 10.5px Inter, system-ui';g.fillText(MES[lastM],x+1,9);g.fillStyle=grid;g.fillRect(x,0,1,H)}
+    if(d.getMonth()!==lastM){lastM=d.getMonth();g.fillStyle=grid;g.fillRect(x,0,1,H);if(x-lastX>=28&&W-x>=24){g.fillStyle=txt;g.font='700 10px Inter, system-ui';g.fillText(MES[lastM].toUpperCase(),x+2,9);lastX=x}}
     if(cw>=14||k%2===0){g.fillStyle=txt3;g.font='400 9.5px Inter, system-ui';g.fillText(String(isoWeek(d)),x+1,22)}
   });
-  g.fillStyle=txt3;g.font='600 10px Inter, system-ui';g.fillText('TÉCNICO',6,22);
+  g.fillStyle=txt3;g.font='700 9px Inter, system-ui';g.fillText('TÉCNICO',8,22);
   rows.forEach((r,y)=>{
     const top=hh+y*ch;
-    g.fillStyle=txt;g.font='400 11px Inter, system-ui';
-    let name=r.t.n;const maxW=lw-12;
+    g.fillStyle=txt;g.font='500 11px Inter, system-ui';
+    let name=r.t.n;const maxW=lw-14;
     if(g.measureText(name).width>maxW){while(name.length>3&&g.measureText(name+'…').width>maxW)name=name.slice(0,-1);name+='…'}
-    g.fillText(name,6,top+ch/2);
+    g.fillText(name,8,top+ch/2);
     cols.forEach((i,k)=>{const c=r.t.wk[i],x=lw+k*cw;
       g.fillStyle=c?cellColor(c):out;
       g.fillRect(x+1,top+1,cw-2,ch-2);
-      if(PARTIAL.has(i)||r.t.edge.has(i)){g.fillStyle='rgba(255,255,255,.45)';for(let s=-ch;s<cw;s+=4){g.fillRect(x+1+Math.max(0,s),top+1,1,ch-2)}}
+      if(PARTIAL.has(i)||r.t.edge.has(i)){g.fillStyle='rgba(255,255,255,.5)';for(let s=-ch;s<cw;s+=4){g.fillRect(x+1+Math.max(0,s),top+1,1,ch-2)}}
     });
   });
   HM={rows,cols,cw,ch,lw,hh};
-  $('hm-note').textContent=`${fmt0.format(rows.length)} técnicos · ${cols.length} semanas.`+` Datos al ${D.meta.fecha_max}.`+' Las semanas con rayas están incompletas (inicio de datos, semana en curso, o alta/baja del técnico) y no cuentan en las estadísticas. Una semana sin órdenes dentro del periodo activo cuenta como 0 días.';
+  $('hm-note').textContent=`${fmt0.format(rows.length)} técnicos · ${cols.length} semanas · datos al ${D.meta.fecha_max}. Las semanas con rayas están incompletas (inicio de datos, semana en curso, o alta/baja del técnico) y no cuentan en las estadísticas. Una semana sin órdenes dentro del periodo activo cuenta como 0 días.`;
 }
 function hmHit(e){
   const r=$('hm').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
@@ -404,25 +636,24 @@ function hmHit(e){
   const col=x<HM.lw?-1:Math.floor((x-HM.lw)/HM.cw);if(col>=HM.cols.length)return null;
   return {r:HM.rows[row],i:col>=0?HM.cols[col]:null};
 }
+const trow=(a,b)=>`<div class="row"><span>${a}</span><span>${b}</span></div>`;
 $('hm').addEventListener('mousemove',e=>{
   const h=hmHit(e),tip=$('tip');
   if(!h){tip.style.display='none';return}
-  const t=h.r.t;let html=`<b>${esc(t.n)}</b><div class="muted" style="margin-bottom:5px">${esc(t.sucNom)} · ${esc(t.c)}</div>`;
-  if(h.i===null){const s=h.r.st;html+=row('Semanas activas',s.n)+row('Días promedio',fmt.format(s.avgD))+row('Semanas ≤4 días',s.w4)+row('Folios / semana',fmt.format(s.osSem))}
-  else{const c=t.wk[h.i];html+=`<div style="font-weight:600;margin-bottom:3px">${wkRange(h.i)}${PARTIAL.has(h.i)?(h.i===NW-1?' · en curso':' · semana incompleta'):''}</div>`;
+  const t=h.r.t;let html=`<b>${esc(t.n)}</b><div class="muted" style="margin-bottom:6px">${esc(t.sucNom)} · ${esc(t.c)}</div>`;
+  if(h.i===null){const s=h.r.st;html+=trow('Semanas activas',s.n)+trow('Días promedio',fmt.format(s.avgD))+trow('Semanas ≤4 días',s.w4)+trow('Folios / semana',fmt.format(s.osSem))}
+  else{const c=t.wk[h.i];html+=`<div style="font-weight:600;margin-bottom:4px">${wkRange(h.i)}${PARTIAL.has(h.i)?(h.i===NW-1?' · en curso':' · semana incompleta'):''}</div>`;
     if(!c)html+='<div class="muted">Fuera de su periodo activo</div>';
     else if(t.edge.has(h.i))html+=`<div class="muted" style="margin-bottom:3px">Semana de ${t.edge.get(h.i)} · excluida de las estadísticas</div>`;
     if(c){
-html+=row('Días trabajados',c.d)+row('Folios',c.os)+row('Mantenimientos',c.mt)+row('Empresariales',c.em)+row('Folios / día',c.d?fmt.format(c.os/c.d):'—');
-      const b=t.bono[h.i];if(b)html+=row('Bono OS',money(b[5])+(b[4]?` (−${money(b[4])})`:''))}}
+      html+=trow('Días trabajados',c.d)+trow('Folios',c.os)+trow('Mantenimientos',c.mt)+trow('Empresariales',c.em)+trow('Folios / día',c.d?fmt.format(c.os/c.d):'—');
+      const b=t.bono[h.i];if(b)html+=trow('Bono OS',money(b[5])+(b[4]?` (−${money(b[4])})`:''))}}
   tip.innerHTML=html;tip.style.display='block';
   const tw=tip.offsetWidth,th=tip.offsetHeight;
   tip.style.left=Math.min(e.clientX+14,innerWidth-tw-8)+'px';tip.style.top=Math.min(e.clientY+14,innerHeight-th-8)+'px';
 });
 $('hm').addEventListener('mouseleave',()=>$('tip').style.display='none');
 $('hm').addEventListener('click',e=>{const h=hmHit(e);if(h)openTech(h.r.t)});
-$('hm').style.cursor='pointer';
-const row=(a,b)=>`<div class="row"><span>${a}</span><span>${b}</span></div>`;
 
 // ───────────────────────── tabla ─────────────────────────
 const COLS=[
@@ -447,18 +678,19 @@ function renderTable(){
   $('tbl').querySelector('thead').innerHTML='<tr>'+COLS.map(c=>`<th data-k="${c[0]}" class="${c[3]||''} ${c[0]===TS.k?'sorted':''}">${c[1]}${c[0]===TS.k?(TS.d>0?' ↑':' ↓'):''}</th>`).join('')+'</tr>';
   const LIM=300, show=rows.slice(0,LIM);
   $('tbl').querySelector('tbody').innerHTML=show.map((x,k)=>{const s=x.st;
-    const dPill=s.avgD<5?'crit':s.avgD<6?'warn':'ok';
-    const tr=s.trend==null?'<span class="muted">—</span>':`<span class="pill ${s.trend<=-.15?'crit':s.trend<0?'warn':'ok'}">${s.trend<0?'▼':'▲'} ${fmt.format(Math.abs(s.trend*100))}%</span>`;
-    return `<tr data-i="${k}"><td>${esc(x.t.n)}${x.t.k?'':' <span class="muted">(fuera de catálogo)</span>'}</td><td>${esc(x.t.sucNom)}</td><td>${esc(x.t.c)}</td>
-      <td class="num">${s.n}</td><td class="num"><span class="pill ${dPill}">${fmt.format(s.avgD)}</span></td>
-      <td class="num">${s.w4||'<span class="muted">0</span>'}</td><td class="num">${s.w5||'<span class="muted">0</span>'}</td>
+    const dTag=s.avgD<5?'st-red':s.avgD<6?'st-yellow':'st-green';
+    const tr=s.trend==null?'<span class="muted">—</span>':`<span class="status-tag ${s.trend<=-.15?'st-red':s.trend<0?'st-yellow':'st-green'}">${s.trend<0?'▼':'▲'} ${fmt.format(Math.abs(s.trend*100))}%</span>`;
+    return `<tr data-i="${k}"><td><b style="font-weight:600">${esc(x.t.n)}</b>${x.t.k?'':' <span class="muted">(fuera de catálogo)</span>'}</td><td>${esc(x.t.sucNom)}</td><td style="color:var(--text2)">${esc(x.t.c)}</td>
+      <td class="num">${s.n}</td><td class="num"><span class="status-tag ${dTag}">${fmt.format(s.avgD)}</span></td>
+      <td class="num">${s.w4?`<b style="color:var(--red)">${s.w4}</b>`:'<span class="muted">0</span>'}</td><td class="num">${s.w5?`<b style="color:var(--yellow)">${s.w5}</b>`:'<span class="muted">0</span>'}</td>
       <td class="num">${fmt.format(s.osSem)}</td><td class="num">${s.osDia==null?'—':fmt.format(s.osDia)}</td><td class="num">${tr}</td>
-      <td class="num">${s.bonoW?money(s.bono):'<span class="muted">—</span>'}</td></tr>`}).join('');
+      <td class="num">${s.bonoW?`<b style="color:var(--or)">${money(s.bono)}</b>`:'<span class="muted">—</span>'}</td></tr>`}).join('');
   $('tbl-note').textContent=rows.length>LIM?`Mostrando ${LIM} de ${fmt0.format(rows.length)} técnicos. Usa los filtros o exporta el CSV para ver todos.`:`${fmt0.format(rows.length)} técnicos.`;
   $('tbl').querySelectorAll('th').forEach(th=>th.onclick=()=>{const k=th.dataset.k;TS.d=TS.k===k?-TS.d:(COLS.find(c=>c[0]===k)[3]?-1:1);TS.k=k;renderTable()});
   $('tbl').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>openTech(show[+tr.dataset.i].t));
 }
 function exportCSV(){
+  if(!D)return;
   const W=weekIdx();
   const head=['usuario_ffm','tecnico','sucursal','coordinador','poliza','cuadrilla','en_catalogo','semanas','dias_prom','semanas_<=4_dias','semanas_5_dias','folios_semana','folios_dia','tendencia_pct','bono_os']
     .concat(W.map(i=>'dias_'+D.semanas[i])).concat(W.map(i=>'folios_'+D.semanas[i]));
@@ -473,33 +705,46 @@ function exportCSV(){
 // ───────────────────────── ficha del técnico ─────────────────────────
 function openTech(t){
   const W=weekIdx(), st=techStats(t,W), cols=[];for(let i=S.from;i<=S.to;i++)cols.push(i);
-  const m=$('modal');
   const cfg=t.cfg;
   const bonoRows=Object.values(t.bono).filter(b=>b[0]>=S.from&&b[0]<=S.to).sort((a,b)=>b[0]-a[0]);
-  const TIER=['Sin bono','Base','Medio','Alto'];
-  m.innerHTML=`<div class="modal-h"><div><h2>${esc(t.n)}</h2><div class="muted">${esc(t.u)} · ${esc(t.sucNom)} · ${esc(t.c)} · ${esc(t.p||'—')} · ${esc(t.cu||'—')}${t.k?'':' · fuera de catálogo'}</div></div><button class="btn x" onclick="closeModal()">Cerrar ✕</button></div>
-    <div class="mini">
-      <div><div class="l">Semanas activas</div><div class="v">${st.n}</div></div>
-      <div><div class="l">Días promedio</div><div class="v">${st.avgD==null?'—':fmt.format(st.avgD)}</div></div>
-      <div><div class="l">Semanas ≤4 días</div><div class="v">${st.w4}</div></div>
-      <div><div class="l">Folios / semana</div><div class="v">${st.osSem==null?'—':fmt.format(st.osSem)}</div></div>
-      <div><div class="l">Folios / día</div><div class="v">${st.osDia==null?'—':fmt.format(st.osDia)}</div></div>
-      <div><div class="l">Bono OS (periodo)</div><div class="v">${st.bonoW?money(st.bono):'—'}</div></div>
+  const TIER=['<span class="status-tag st-red">Sin bono</span>','<span class="status-tag st-yellow">Base</span>','<span class="status-tag st-orange">Medio</span>','<span class="status-tag st-green">Alto</span>'];
+  $('modal').innerHTML=`
+    <div class="tec-profile">
+      <div class="tec-av">${esc(initials(t.n))}</div>
+      <div class="tec-info">
+        <div class="tec-name">${esc(t.n)}</div>
+        <div class="tec-coord">Coordinador: ${esc(t.c)}</div>
+        <div class="tec-tags"><span class="tec-tag sp">${esc(t.sucNom)}</span><span class="tec-tag">${esc(t.u)}</span>${t.p?`<span class="tec-tag">${esc(t.p)}</span>`:''}${t.cu?`<span class="tec-tag">${esc(t.cu)}</span>`:''}${t.k?'':'<span class="tec-tag">Fuera de catálogo</span>'}</div>
+      </div>
+      <button class="btn-outline" onclick="closeModal()">Cerrar ✕</button>
     </div>
-    <div class="card" style="margin-bottom:12px"><h3>Asistencia diaria</h3><div class="sub">Cada cuadro es un día; relleno = al menos una orden completada.</div>
-      <div class="legend"><span><i class="sw" style="background:var(--st-good)"></i>Trabajó</span><span><i class="sw" style="background:var(--st-none)"></i>Sin órdenes</span><span><i class="sw" style="background:var(--card2)"></i>Fuera de periodo</span></div>
-      <div style="overflow-x:auto"><canvas id="cal"></canvas></div></div>
-    <div class="card" style="margin-bottom:12px"><h3>Folios por semana</h3><div class="sub">${cfg?`Metas ${esc(cfg.nombre)}: ${cfg.metas.join(' / ')} (base / medio / alto)`:'Sin metas configuradas para esta sucursal'}</div>
-      <div class="legend"><span><i class="sw" style="background:var(--st-good)"></i>6–7 días</span><span><i class="sw" style="background:var(--st-warn)"></i>5 días</span><span><i class="sw" style="background:var(--st-crit)"></i>≤4 días</span>${cfg?'<span><i class="sw" style="background:var(--text3);height:2px"></i>Meta base / alta</span>':''}</div>
-      <div class="chartbox"><canvas id="c-tec"></canvas></div></div>
-    ${bonoRows.length?`<div class="card"><h3>Bono esquema OS</h3><div class="sub">Semanas desde ${esc(D.meta.vigente_desde)}${[...PARTIAL].some(i=>t.bono[i])?' · la semana en curso es preliminar':''}</div>
+    <div class="kpi-row kpi-6">
+      ${kpi('hl','cal','Semanas activas',st.n,'or','en el periodo')}
+      ${kpi('','cal','Días promedio',st.avgD==null?'—':fmt.format(st.avgD),st.avgD<5?'rd':st.avgD<6?'yl':'gr','por semana')}
+      ${kpi('red-top','alert','Semanas ≤4 días',st.w4,'rd','pierden el 100%')}
+      ${kpi('','os','Folios / semana',st.osSem==null?'—':fmt.format(st.osSem),'dk',cfg?`metas ${cfg.metas.join(' / ')}`:'sin metas')}
+      ${kpi('','os','Folios / día',st.osDia==null?'—':fmt.format(st.osDia),'dk','por día trabajado')}
+      ${kpi('green-top','money','Bono OS',st.bonoW?money(st.bono):'—','gr',st.bonoW?`${st.bonoW} semana${st.bonoW===1?'':'s'}`:'sin semanas con bono')}
+    </div>
+    <div class="cc mb">
+      <div class="cc-head"><div><div class="cc-title">Asistencia diaria</div><div class="cc-sub">Cada cuadro es un día; relleno = al menos una orden completada.</div></div></div>
+      <div class="legend"><span><i class="dot" style="background:var(--d7)"></i>Trabajó</span><span><i class="dot" style="background:var(--dnone)"></i>Sin órdenes</span><span><i class="dot" style="background:var(--out);border:1px solid var(--border)"></i>Fuera de periodo</span></div>
+      <div style="overflow-x:auto"><canvas id="cal"></canvas></div>
+    </div>
+    <div class="cc mb">
+      <div class="cc-head"><div><div class="cc-title">Folios por semana</div><div class="cc-sub">${cfg?`Metas ${esc(cfg.nombre)}: ${cfg.metas.join(' / ')} (base / medio / alto)`:'Sin metas configuradas para esta sucursal'}</div></div></div>
+      <div class="legend"><span><i class="dot" style="background:var(--d7)"></i>6–7 días</span><span><i class="dot" style="background:var(--d5)"></i>5 días</span><span><i class="dot" style="background:var(--d0)"></i>≤4 días</span>${cfg?'<span><i class="dot" style="background:var(--text3);height:2px"></i>Meta base / alta</span>':''}</div>
+      <div class="chartbox"><canvas id="c-tec"></canvas></div>
+    </div>
+    ${bonoRows.length?`<div class="tc">
+      <div class="tc-head"><div><div class="cc-title">Bono esquema OS</div><div class="cc-sub">Semanas desde ${esc(D.meta.vigente_desde)}${[...PARTIAL].some(i=>t.bono[i])?' · la semana en curso es preliminar':''}</div></div></div>
       <div class="tbl-wrap"><table><thead><tr><th>Semana</th><th class="num">Días</th><th class="num">Folios</th><th class="num">Mant.</th><th class="num">Empres.</th><th class="num">Ponderados</th><th>Tier</th><th class="num">Bono tier</th><th class="num">Adicionales</th><th class="num">Descuento</th><th class="num">Total</th></tr></thead><tbody>
-      ${bonoRows.map(b=>{const c=t.wk[b[0]];const pond=c.os+c.em*(D.esquema.factor_empresarial-1);return `<tr style="cursor:default"><td>${wkRange(b[0])}${b[0]===NW-1&&PARTIAL.has(b[0])?' <span class="muted">(en curso)</span>':''}</td><td class="num">${c.d}</td><td class="num">${c.os}</td><td class="num">${c.mt}</td><td class="num">${c.em}</td><td class="num">${fmt.format(pond)}</td><td>${TIER[b[1]]}${b[6]!==(cfg&&cfg.metas[2])?' <span class="muted">(alta topada en '+b[6]+')</span>':''}</td><td class="num">${money(b[2])}</td><td class="num">${money(b[3])}</td><td class="num">${b[4]?'−'+money(b[4]):'—'}</td><td class="num"><b>${money(b[5])}</b></td></tr>`}).join('')}
+      ${bonoRows.map(b=>{const c=t.wk[b[0]];const pond=c.os+c.em*(D.esquema.factor_empresarial-1);return `<tr style="cursor:default"><td>${wkRange(b[0])}${b[0]===NW-1&&PARTIAL.has(b[0])?' <span class="muted">(en curso)</span>':''}</td><td class="num">${c.d}</td><td class="num">${c.os}</td><td class="num">${c.mt}</td><td class="num">${c.em}</td><td class="num">${fmt.format(pond)}</td><td>${TIER[b[1]]}${b[6]!==(cfg&&cfg.metas[2])?' <span class="muted">(alta topada en '+b[6]+')</span>':''}</td><td class="num">${money(b[2])}</td><td class="num">${money(b[3])}</td><td class="num">${b[4]?`<span style="color:var(--red)">−${money(b[4])}</span>`:'—'}</td><td class="num"><b style="color:var(--or)">${money(b[5])}</b></td></tr>`}).join('')}
       </tbody></table></div></div>`:''}`;
   $('modal-bg').style.display='flex';
   drawCalendar(t,cols);
   const labels=cols.map(wkLabel);
-  const colr=c=>!c?'transparent':c.d>=6?css('--st-good'):c.d===5?css('--st-warn'):css('--st-crit');
+  const colr=c=>!c?'transparent':c.d>=6?css('--d7'):c.d===5?css('--d5'):css('--d0');
   const ds=[{type:'bar',label:'Folios',data:cols.map((i,k)=>({x:labels[k],y:t.wk[i]?t.wk[i].os:null,i})),backgroundColor:cols.map(i=>colr(t.wk[i])),borderRadius:{topLeft:4,topRight:4},borderSkipped:'bottom',barPercentage:.8,categoryPercentage:.9}];
   if(cfg){const ln=(v,l)=>({type:'line',label:l,data:cols.map((i,k)=>({x:labels[k],y:v,i})),borderColor:css('--text3'),borderWidth:1,borderDash:[4,4],pointRadius:0,pointHoverRadius:0});ds.push(ln(cfg.metas[0],'Meta base'),ln(cfg.metas[2],'Meta alta'))}
   mkChart('c-tec',{data:{labels,datasets:ds},options:baseOpts()});
@@ -509,13 +754,13 @@ function drawCalendar(t,cols){
   const W=lw+cols.length*(cs+gap),H=hh+7*(cs+gap);
   const dpr=window.devicePixelRatio||1;cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
   const g=cv.getContext('2d');g.scale(dpr,dpr);g.clearRect(0,0,W,H);
-  g.font='400 9.5px Inter, system-ui';g.textBaseline='middle';g.fillStyle=css('--text3');
+  g.font='500 9.5px Inter, system-ui';g.textBaseline='middle';g.fillStyle=css('--text3');
   ['L','M','M','J','V','S','D'].forEach((d,k)=>g.fillText(d,4,hh+k*(cs+gap)+cs/2));
   let lastM=-1,lastX=-99;
-  const on=css('--st-good'),off=css('--st-none'),out=css('--card2');
-  const last=new Date(parseD(D.meta.fecha_max));
+  const on=css('--d7'),off=css('--dnone'),out=css('--out');
+  const last=parseD(D.meta.fecha_max);
   cols.forEach((i,k)=>{const x=lw+k*(cs+gap),d0=WEEKS[i];
-    if(d0.getMonth()!==lastM){lastM=d0.getMonth();if(x-lastX>=26){g.fillStyle=css('--text2');g.fillText(MES[lastM],x,7);lastX=x}}
+    if(d0.getMonth()!==lastM){lastM=d0.getMonth();if(x-lastX>=26){g.fillStyle=css('--text2');g.font='700 9.5px Inter, system-ui';g.fillText(MES[lastM].toUpperCase(),x,7);g.font='500 9.5px Inter, system-ui';lastX=x}}
     const c=t.wk[i];
     for(let d=0;d<7;d++){const day=new Date(d0);day.setDate(day.getDate()+d);if(day>last)continue;
       g.fillStyle=!c?out:(c.m>>d)&1?on:off;g.beginPath();g.roundRect(x,hh+d*(cs+gap),cs,cs,2.5);g.fill()}
@@ -523,8 +768,6 @@ function drawCalendar(t,cols){
 }
 function closeModal(){$('modal-bg').style.display='none'}
 window.closeModal=closeModal;
-
-boot();
 </script>
 </body>
 </html>
