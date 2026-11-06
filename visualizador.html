@@ -6,7 +6,6 @@
 <title>QiORA | Asistencia y Productividad</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -161,24 +160,6 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 .tec-tag.sp{background:var(--or-light);color:var(--or)}
 #cal{display:block}
 
-/* LOGIN SCREEN */
-#login-screen{position:fixed;z-index:9999;inset:0;background:linear-gradient(135deg,#1a1a2e 0%,#0f0f1a 100%);display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif}
-.login-card{background:white;border-radius:20px;padding:40px 44px;width:min(420px,90vw);box-shadow:0 32px 80px rgba(0,0,0,.35)}
-.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
-.login-brand{font-size:22px;font-weight:800;color:var(--or);line-height:1.1}
-.login-brand-sub{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-top:2px}
-.login-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:6px}
-.login-subtitle{font-size:13px;color:var(--text2);margin-bottom:28px;line-height:1.5}
-.login-field{margin-bottom:16px}
-.login-label{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;display:block}
-.login-input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:#F9F9FB;outline:none;transition:border-color .15s}
-.login-input:focus{border-color:var(--or);background:white}
-.login-btn{width:100%;background:var(--or);color:white;border:none;border-radius:10px;padding:13px;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px;transition:background .15s}
-.login-btn:hover:not(:disabled){background:var(--or-dark)}
-.login-btn:disabled{opacity:.65;cursor:not-allowed}
-.login-error{color:var(--red);font-size:12px;font-weight:600;margin-top:10px;padding:10px 12px;background:var(--red-l);border-radius:8px;display:none}
-.login-spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:3px}
@@ -194,31 +175,6 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
 </style>
 </head>
 <body>
-
-<!-- ═══════════ LOGIN ═══════════ -->
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">
-      <img class="qiora-logo" style="width:44px;height:44px;border-radius:12px;flex-shrink:0" alt="QiORA"/>
-      <div>
-        <div class="login-brand">QiORA</div>
-        <div class="login-brand-sub">Sistema de Bonos · TotalPlay</div>
-      </div>
-    </div>
-    <div class="login-title">Iniciar sesión</div>
-    <div class="login-subtitle">Accede con las credenciales asignadas por tu administrador.</div>
-    <div class="login-field">
-      <label class="login-label" for="login-email">Correo electrónico</label>
-      <input class="login-input" type="email" id="login-email" placeholder="usuario@qiora.com" autocomplete="email"/>
-    </div>
-    <div class="login-field">
-      <label class="login-label" for="login-password">Contraseña</label>
-      <input class="login-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/>
-    </div>
-    <button class="login-btn" id="login-btn">Entrar</button>
-    <div class="login-error" id="login-error"></div>
-  </div>
-</div>
 
 <!-- ═══════════ SIDEBAR ═══════════ -->
 <nav class="sidebar">
@@ -247,19 +203,6 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     </a>
   </div>
 
-  <div id="user-info-bar" style="padding:12px 16px;border-top:1px solid var(--border);display:none">
-    <div style="display:flex;align-items:center;gap:8px">
-      <div style="width:28px;height:28px;border-radius:50%;background:var(--or);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;flex-shrink:0" id="user-avatar">—</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="user-display-name">—</div>
-        <div style="font-size:10px;color:var(--text3)" id="user-display-rol">—</div>
-      </div>
-      <button id="logout-btn" title="Cerrar sesión" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;border-radius:6px;display:flex;align-items:center">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      </button>
-    </div>
-  </div>
-
   <div class="s-export">
     <button class="btn-exp" id="csv">
       <svg viewBox="0 0 24 24" stroke-width="2.2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -279,7 +222,6 @@ tbody tr:hover td{background:#FAFAFA;cursor:pointer}
     </div>
     <div class="tb-right">
       <div class="tb-src" id="src">Sin datos cargados</div>
-      <div class="u-avatar" id="topbar-avatar">—</div>
     </div>
   </div>
 
@@ -382,47 +324,6 @@ function parseD(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d
 function isoWeek(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7)}
 function wkLabel(i){const d=WEEKS[i];return `${d.getDate()} ${MES[d.getMonth()]}`}
 function wkRange(i){const a=WEEKS[i],b=new Date(a);b.setDate(b.getDate()+6);return `Sem ${isoWeek(a)} · ${a.getDate()} ${MES[a.getMonth()]} – ${b.getDate()} ${MES[b.getMonth()]}`}
-
-// ───────────────────────── login (Supabase, mismo que index.html) ─────────────────────────
-const SUPABASE_URL='https://tfeqaqocendwvanlible.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRmZXFhcW9jZW5kd3ZhbmxpYmxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NjYxODQsImV4cCI6MjA5MDI0MjE4NH0.Hq8cCbjFKTNrvja9BzgU1vB2nG0XtbKK0C3AjJGPcWA';
-const _sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-const ROL_LABELS={admin:'Administrador',director:'Director',finanzas:'Finanzas',lider_distrital:'Líder Distrital',coordinador:'Coordinador',tecnico:'Técnico'};
-let _currentUser=null;
-
-function showLogin(msg){
-  $('login-screen').style.display='flex';
-  $('login-btn').disabled=false;$('login-btn').innerHTML='Entrar';
-  const e=$('login-error');e.textContent=msg||'';e.style.display=msg?'block':'none';
-}
-async function fetchProfile(authUser){
-  const {data,error}=await _sb.from('usuarios').select('*').eq('id',authUser.id).single();
-  if(error||!data){await _sb.auth.signOut();showLogin('Tu usuario no tiene perfil configurado. Contacta al administrador.');return}
-  _currentUser={email:data.email||authUser.email,nombre:data.nombre||data.name||'',rol:data.rol||'tecnico'};
-  $('login-screen').style.display='none';
-  const ini=initials(_currentUser.nombre||_currentUser.email);
-  $('user-avatar').textContent=ini;$('topbar-avatar').textContent=ini;
-  $('user-display-name').textContent=_currentUser.nombre||_currentUser.email;
-  $('user-display-rol').textContent=ROL_LABELS[_currentUser.rol]||_currentUser.rol;
-  $('user-info-bar').style.display='block';
-  if(!D)boot();
-}
-async function doLogin(){
-  const email=$('login-email').value.trim(),password=$('login-password').value;
-  if(!email||!password){showLogin('Ingresa tu correo y contraseña.');return}
-  $('login-error').style.display='none';
-  const btn=$('login-btn');btn.disabled=true;btn.innerHTML='<div class="login-spinner"></div>';
-  const {data,error}=await _sb.auth.signInWithPassword({email,password});
-  if(error){showLogin(error.message==='Invalid login credentials'?'Credenciales incorrectas. Verifica tu correo y contraseña.':error.message);return}
-  await fetchProfile(data.user);
-}
-async function doLogout(){await _sb.auth.signOut();_currentUser=null;$('user-info-bar').style.display='none';showLogin()}
-$('login-btn').onclick=doLogin;
-$('login-email').onkeydown=e=>{if(e.key==='Enter')$('login-password').focus()};
-$('login-password').onkeydown=e=>{if(e.key==='Enter')doLogin()};
-$('logout-btn').onclick=doLogout;
-_sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&_currentUser){_currentUser=null;showLogin()}});
-(async()=>{const {data:{session}}=await _sb.auth.getSession();if(session)await fetchProfile(session.user);else showLogin()})();
 
 // ───────────────────────── carga de datos ─────────────────────────
 async function boot(){
@@ -768,6 +669,7 @@ function drawCalendar(t,cols){
 }
 function closeModal(){$('modal-bg').style.display='none'}
 window.closeModal=closeModal;
+boot();
 </script>
 </body>
 </html>
